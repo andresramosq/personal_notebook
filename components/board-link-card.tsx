@@ -45,8 +45,13 @@ export function BoardLinkCard({
         onMove(link.id, event.clientX - rect.left, event.clientY - rect.top);
         movedRef.current = false;
       }}
+      onMouseEnter={() => {
+        if (!link.pending) {
+          router.prefetch(`/pizarra/${link.targetBoardId}`);
+        }
+      }}
       onClick={() => {
-        if (movedRef.current) {
+        if (link.pending || movedRef.current) {
           return;
         }
 

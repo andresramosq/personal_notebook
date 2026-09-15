@@ -19,6 +19,53 @@ export async function getOrCreateRootBoard() {
   });
 }
 
+export async function getBoardPageData(boardId: string) {
+  const board = await prisma.board.findUnique({
+    where: { id: boardId },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      links: {
+        select: {
+          id: true,
+          targetBoardId: true,
+          x: true,
+          y: true,
+          targetBoard: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+      targets: {
+        take: 1,
+        select: {
+          parentBoard: {
+            select: {
+              id: true,
+              slug: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!board) {
+    return null;
+  }
+
+  const { links, targets, ...boardData } = board;
+
+  return {
+    board: boardData,
+    links: formatBoardLinks(links),
+    parentBoard: targets[0]?.parentBoard ?? null,
+  };
+}
+
 export async function getBoardWithLinks(boardId: string) {
   return prisma.board.findUnique({
     where: { id: boardId },
@@ -46,10 +93,26 @@ export async function createBoardLink(
   y: number,
 ) {
   return prisma.$transaction(async (tx) => {
-    const name = `Pizarra ${(await tx.board.count()) + 1}`;
+    const latest = await tx.board.findFirst({
+      where: { slug: null },
+      orderBy: { createdAt: "desc" },
+      select: { name: true },
+    });
+
+    let nextNumber = 2;
+
+    if (latest?.name.startsWith("Pizarra ")) {
+      const parsed = Number.parseInt(latest.name.slice(8), 10);
+
+      if (!Number.isNaN(parsed)) {
+        nextNumber = parsed + 1;
+      }
+    }
 
     const targetBoard = await tx.board.create({
-      data: { name },
+      data: {
+        name: `Pizarra ${nextNumber}`,
+      },
     });
 
     const link = await tx.boardLink.create({

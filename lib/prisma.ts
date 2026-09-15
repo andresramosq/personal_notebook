@@ -9,3 +9,5 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
+
+void prisma.$executeRawUnsafe("PRAGMA journal_mode = WAL;");

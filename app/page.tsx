@@ -1,16 +1,20 @@
 import { BoardShell } from "@/components/board-shell";
-import { formatBoardLinks, getBoardWithLinks, getOrCreateRootBoard } from "@/lib/boards";
+import { getBoardPageData, getOrCreateRootBoard } from "@/lib/boards";
 
 export default async function Home() {
-  const board = await getOrCreateRootBoard();
-  const boardWithLinks = await getBoardWithLinks(board.id);
+  const rootBoard = await getOrCreateRootBoard();
+  const pageData = await getBoardPageData(rootBoard.id);
+
+  if (!pageData) {
+    return null;
+  }
 
   return (
     <BoardShell
-      boardId={board.id}
-      boardName={board.name}
+      boardId={pageData.board.id}
+      boardName={pageData.board.name}
       backHref={null}
-      initialLinks={formatBoardLinks(boardWithLinks?.links ?? [])}
+      initialLinks={pageData.links}
     />
   );
 }

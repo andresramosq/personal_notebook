@@ -1,6 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
+import {
+  createBoardLinkAction,
+  updateBoardLinkPositionAction,
+  updateBoardNameAction,
+} from "@/app/actions/boards";
 import { BoardLinkCard } from "@/components/board-link-card";
 import { BoardSidebar, PIZARRA_DRAG_TYPE } from "@/components/board-sidebar";
 import { EditableName } from "@/components/editable-name";
@@ -11,6 +16,7 @@ export type BoardLinkItem = {
   name: string;
   x: number;
   y: number;
+  pending?: boolean;
 };
 
 type BoardShellProps = {
@@ -30,16 +36,9 @@ export function BoardShell({
   const [boardName, setBoardName] = useState(initialBoardName);
   const [links, setLinks] = useState(initialLinks);
 
-  const renameBoard = async (targetBoardId: string, name: string) => {
-    const response = await fetch(`/api/boards/${targetBoardId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-
-    if (!response.ok) {
-      return;
-    }
+  const renameBoard = (targetBoardId: string, name: string) => {
+    const previousBoardName = boardName;
+    const previousLinks = links;
 
     if (targetBoardId === boardId) {
       setBoardName(name);
@@ -50,23 +49,24 @@ export function BoardShell({
         link.targetBoardId === targetBoardId ? { ...link, name } : link,
       ),
     );
+
+    void updateBoardNameAction(targetBoardId, name).catch(() => {
+      setBoardName(previousBoardName);
+      setLinks(previousLinks);
+    });
   };
 
-  const updateLinkPosition = async (linkId: string, x: number, y: number) => {
+  const updateLinkPosition = (linkId: string, x: number, y: number) => {
     setLinks((current) =>
       current.map((link) =>
         link.id === linkId ? { ...link, x, y } : link,
       ),
     );
 
-    await fetch(`/api/boards/${boardId}/links/${linkId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ x, y }),
-    });
+    void updateBoardLinkPositionAction(linkId, boardId, x, y);
   };
 
-  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
 
     if (!event.dataTransfer.getData(PIZARRA_DRAG_TYPE) || !canvasRef.current) {
@@ -76,19 +76,27 @@ export function BoardShell({
     const rect = canvasRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
+    const tempId = crypto.randomUUID();
+    const tempLink: BoardLinkItem = {
+      id: tempId,
+      targetBoardId: tempId,
+      name: "Pizarra…",
+      x,
+      y,
+      pending: true,
+    };
 
-    const response = await fetch(`/api/boards/${boardId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ x, y }),
-    });
+    setLinks((current) => [...current, tempLink]);
 
-    if (!response.ok) {
-      return;
-    }
-
-    const data = (await response.json()) as { link: BoardLinkItem };
-    setLinks((current) => [...current, data.link]);
+    void createBoardLinkAction(boardId, x, y)
+      .then((link) => {
+        setLinks((current) =>
+          current.map((item) => (item.id === tempId ? link : item)),
+        );
+      })
+      .catch(() => {
+        setLinks((current) => current.filter((item) => item.id !== tempId));
+      });
   };
 
   return (
@@ -103,9 +111,7 @@ export function BoardShell({
             event.preventDefault();
             event.dataTransfer.dropEffect = "copy";
           }}
-          onDrop={(event) => {
-            void handleDrop(event);
-          }}
+          onDrop={handleDrop}
         >
           <div className="absolute top-5 left-6 max-w-xs">
             <EditableName

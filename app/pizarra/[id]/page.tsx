@@ -1,11 +1,6 @@
 import { notFound } from "next/navigation";
 import { BoardShell } from "@/components/board-shell";
-import {
-  formatBoardLinks,
-  getBackHref,
-  getBoardWithLinks,
-  getParentBoard,
-} from "@/lib/boards";
+import { getBackHref, getBoardPageData } from "@/lib/boards";
 
 type PizarraPageProps = {
   params: Promise<{ id: string }>;
@@ -13,20 +8,18 @@ type PizarraPageProps = {
 
 export default async function PizarraPage({ params }: PizarraPageProps) {
   const { id } = await params;
-  const board = await getBoardWithLinks(id);
+  const pageData = await getBoardPageData(id);
 
-  if (!board) {
+  if (!pageData) {
     notFound();
   }
 
-  const parentBoard = await getParentBoard(board.id);
-
   return (
     <BoardShell
-      boardId={board.id}
-      boardName={board.name}
-      backHref={getBackHref(parentBoard)}
-      initialLinks={formatBoardLinks(board.links)}
+      boardId={pageData.board.id}
+      boardName={pageData.board.name}
+      backHref={getBackHref(pageData.parentBoard)}
+      initialLinks={pageData.links}
     />
   );
 }
