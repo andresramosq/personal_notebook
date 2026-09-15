@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 
 export const BOARD_CANVAS = {
-  width: 1280,
-  height: 720,
   gridSize: 24,
 } as const;
 
@@ -76,18 +74,12 @@ export function BoardCanvas({ className = "" }: BoardCanvasProps) {
   return (
     <div
       ref={containerRef}
-      className="relative overflow-visible"
-      style={{
-        width: BOARD_CANVAS.width,
-        height: BOARD_CANVAS.height,
-      }}
+      className={`relative h-full w-full overflow-hidden ${className}`}
     >
       <div
         ref={boardRef}
-        className={`board-surface absolute top-0 left-0 border border-[#d4d4d4] bg-[#fafafa] shadow-sm ${className}`}
+        className="board-surface absolute top-0 left-0 h-full w-full bg-[#fafafa]"
         style={{
-          width: BOARD_CANVAS.width,
-          height: BOARD_CANVAS.height,
           backgroundSize: `${BOARD_CANVAS.gridSize}px ${BOARD_CANVAS.gridSize}px`,
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: "0 0",

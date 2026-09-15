@@ -2,7 +2,7 @@ import { BoardCanvas } from "@/components/board-canvas";
 
 export default function Home() {
   return (
-    <main className="flex h-dvh items-center justify-center bg-[#e8e8e8]">
+    <main className="h-dvh w-full overflow-hidden">
       <BoardCanvas />
     </main>
   );

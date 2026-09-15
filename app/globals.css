@@ -14,6 +14,7 @@
 
 html {
   color-scheme: light;
+  overflow: hidden;
 }
 
 body {
