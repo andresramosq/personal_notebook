@@ -14,7 +14,7 @@ function ChevronLeftIcon() {
       className="size-4"
       aria-hidden
     >
-      <path d="M12 5 7 10l5 5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 5 7 10l5.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -22,15 +22,18 @@ function ChevronLeftIcon() {
 function BoardIcon() {
   return (
     <svg
-      viewBox="0 0 20 20"
+      viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.75"
-      className="size-4"
+      strokeWidth="1.5"
+      className="size-5"
       aria-hidden
     >
-      <rect x="3.5" y="3.5" width="13" height="13" rx="2" />
-      <path d="M7 8h6M7 10.5h4" strokeLinecap="round" />
+      <rect x="4" y="4" width="16" height="16" rx="2.5" />
+      <path
+        d="M4 9.5h16M9.5 9.5V20"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -41,7 +44,7 @@ type BoardSidebarProps = {
 
 export function BoardSidebar({ backHref }: BoardSidebarProps) {
   return (
-    <aside className="flex w-14 shrink-0 flex-col items-center border-r border-[#ececec] bg-white py-3">
+    <aside className="flex w-[4.75rem] shrink-0 flex-col items-center border-r border-[#ececec] bg-white py-3">
       {backHref ? (
         <Link
           href={backHref}
@@ -63,14 +66,16 @@ export function BoardSidebar({ backHref }: BoardSidebarProps) {
 
       <div
         draggable
-        title="Pizarra"
         onDragStart={(event) => {
           event.dataTransfer.setData(PIZARRA_DRAG_TYPE, "pizarra");
           event.dataTransfer.effectAllowed = "copy";
         }}
-        className="sidebar-btn mt-3 flex size-9 cursor-grab items-center justify-center rounded-md active:cursor-grabbing"
+        className="mt-4 flex w-full cursor-grab flex-col items-center gap-1.5 rounded-lg px-1 py-2 transition-colors hover:bg-[#f5f5f5] active:cursor-grabbing"
       >
-        <BoardIcon />
+        <div className="flex size-10 items-center justify-center rounded-lg bg-[#f5f5f5] text-[#525252]">
+          <BoardIcon />
+        </div>
+        <span className="text-[11px] leading-none text-[#737373]">Pizarra</span>
       </div>
     </aside>
   );
