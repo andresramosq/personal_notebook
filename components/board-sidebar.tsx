@@ -19,11 +19,13 @@ function ChevronLeftIcon() {
   );
 }
 
-function BoardPreview() {
+export function BoardPreview({ className }: { className?: string }) {
   return (
-    <div className="board-card-preview h-full w-full overflow-hidden rounded-md">
+    <div
+      className={`board-card-preview overflow-hidden rounded-md ${className ?? ""}`}
+    >
       <div className="h-2 border-b border-[#ececec] bg-[#f5f5f5]" />
-      <div className="h-full bg-white" />
+      <div className="min-h-12 flex-1 bg-white" />
     </div>
   );
 }
@@ -34,37 +36,39 @@ type BoardSidebarProps = {
 
 export function BoardSidebar({ backHref }: BoardSidebarProps) {
   return (
-    <aside className="flex w-14 shrink-0 flex-col items-center border-r border-[#ececec] bg-white py-3">
-      {backHref ? (
-        <Link
-          href={backHref}
-          aria-label="Atrás"
-          className="sidebar-btn flex size-9 items-center justify-center rounded-md"
-        >
-          <ChevronLeftIcon />
-        </Link>
-      ) : (
-        <button
-          type="button"
-          disabled
-          aria-label="Atrás"
-          className="sidebar-btn flex size-9 items-center justify-center rounded-md"
-        >
-          <ChevronLeftIcon />
-        </button>
-      )}
+    <aside className="flex w-48 shrink-0 flex-col border-r border-[#ececec] bg-white">
+      <div className="flex h-12 items-center border-b border-[#ececec] px-3">
+        {backHref ? (
+          <Link
+            href={backHref}
+            aria-label="Atrás"
+            className="sidebar-btn flex size-8 items-center justify-center rounded-md"
+          >
+            <ChevronLeftIcon />
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled
+            aria-label="Atrás"
+            className="sidebar-btn flex size-8 items-center justify-center rounded-md"
+          >
+            <ChevronLeftIcon />
+          </button>
+        )}
+      </div>
 
-      <div className="mt-auto px-2 pb-1">
+      <div className="p-3">
         <div
           draggable
-          title="Pizarra"
           onDragStart={(event) => {
             event.dataTransfer.setData(PIZARRA_DRAG_TYPE, "pizarra");
             event.dataTransfer.effectAllowed = "copy";
           }}
-          className="h-12 w-10 cursor-grab overflow-hidden rounded-md active:cursor-grabbing"
+          className="group cursor-grab rounded-lg p-2 transition-colors hover:bg-[#f5f5f5] active:cursor-grabbing"
         >
-          <BoardPreview />
+          <BoardPreview className="h-20 shadow-sm transition-shadow group-hover:shadow-md" />
+          <p className="mt-2 text-center text-[12px] text-[#737373]">Pizarra</p>
         </div>
       </div>
     </aside>
