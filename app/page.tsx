@@ -1,3 +1,15 @@
-export default function Home() {
-  return <main className="h-dvh w-full bg-[#f7f3eb]" />;
+import { BoardShell } from "@/components/board-shell";
+import { getBoardWithLinks, getOrCreateRootBoard } from "@/lib/boards";
+
+export default async function Home() {
+  const board = await getOrCreateRootBoard();
+  const boardWithLinks = await getBoardWithLinks(board.id);
+
+  return (
+    <BoardShell
+      boardId={board.id}
+      isHome
+      initialLinks={boardWithLinks?.links ?? []}
+    />
+  );
 }
