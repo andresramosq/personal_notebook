@@ -31,6 +31,5 @@ body {
 
 .board-surface {
   background-color: #fafafa;
-  background-image: radial-gradient(rgba(120, 98, 72, 0.08) 0.8px, transparent 0.8px);
-  background-size: 24px 24px;
+  background-image: radial-gradient(circle, #c4c4c4 1px, transparent 1px);
 }

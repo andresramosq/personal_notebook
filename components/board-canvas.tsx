@@ -1,6 +1,7 @@
 export const BOARD_CANVAS = {
   width: 1280,
   height: 720,
+  gridSize: 24,
 } as const;
 
 type BoardCanvasProps = {
@@ -14,6 +15,7 @@ export function BoardCanvas({ className = "" }: BoardCanvasProps) {
       style={{
         width: BOARD_CANVAS.width,
         height: BOARD_CANVAS.height,
+        backgroundSize: `${BOARD_CANVAS.gridSize}px ${BOARD_CANVAS.gridSize}px`,
       }}
     />
   );
