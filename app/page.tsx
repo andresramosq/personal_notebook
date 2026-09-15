@@ -11,6 +11,7 @@ export default async function Home() {
 
   return (
     <BoardShell
+      key={pageData.board.id}
       boardId={pageData.board.id}
       boardName={pageData.board.name}
       isHome

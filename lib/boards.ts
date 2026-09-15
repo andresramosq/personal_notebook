@@ -1,4 +1,8 @@
 import { prisma } from "@/lib/prisma";
+import {
+  canPlaceBoardCard,
+  clampBoardPosition,
+} from "@/lib/board-config";
 
 export type BoardLinkItem = {
   id: string;
@@ -92,6 +96,12 @@ export async function createBoardLink(
   x: number,
   y: number,
 ) {
+  const clamped = clampBoardPosition(x, y);
+
+  if (!canPlaceBoardCard(clamped.x, clamped.y)) {
+    throw new Error("Posición inválida para la tarjeta.");
+  }
+
   return prisma.$transaction(async (tx) => {
     const latest = await tx.board.findFirst({
       where: { slug: null },
@@ -119,8 +129,8 @@ export async function createBoardLink(
       data: {
         parentBoardId,
         targetBoardId: targetBoard.id,
-        x,
-        y,
+        x: clamped.x,
+        y: clamped.y,
       },
       select: {
         id: true,
@@ -151,12 +161,18 @@ export async function updateBoardLinkPosition(
   x: number,
   y: number,
 ) {
+  const clamped = clampBoardPosition(x, y);
+
+  if (!canPlaceBoardCard(clamped.x, clamped.y)) {
+    throw new Error("Posición inválida para la tarjeta.");
+  }
+
   return prisma.boardLink.updateMany({
     where: {
       id: linkId,
       parentBoardId,
     },
-    data: { x, y },
+    data: { x: clamped.x, y: clamped.y },
   });
 }
 

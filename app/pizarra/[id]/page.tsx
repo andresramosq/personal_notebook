@@ -16,6 +16,7 @@ export default async function PizarraPage({ params }: PizarraPageProps) {
 
   return (
     <BoardShell
+      key={pageData.board.id}
       boardId={pageData.board.id}
       boardName={pageData.board.name}
       isHome={false}

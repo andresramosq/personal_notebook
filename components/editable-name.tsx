@@ -35,6 +35,7 @@ export function EditableName({
     const trimmed = draft.trim();
 
     if (!trimmed) {
+      setDraft(value);
       setEditing(false);
       return;
     }
@@ -53,6 +54,7 @@ export function EditableName({
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={save}
+        onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
@@ -61,6 +63,7 @@ export function EditableName({
           }
 
           if (event.key === "Escape") {
+            setDraft(value);
             setEditing(false);
           }
         }}
@@ -75,7 +78,9 @@ export function EditableName({
   return (
     <button
       type="button"
+      onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
+        event.preventDefault();
         event.stopPropagation();
         startEditing();
       }}

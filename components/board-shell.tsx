@@ -32,8 +32,29 @@ type BoardShellProps = {
   initialLinks: BoardLinkItem[];
 };
 
-const MIN_ZOOM = 0.5;
+const MIN_ZOOM = 0.35;
 const MAX_ZOOM = 2;
+const VIEWPORT_PADDING = 48;
+
+function getInitialViewportState(viewport: HTMLDivElement) {
+  const availWidth = viewport.clientWidth - VIEWPORT_PADDING;
+  const availHeight = viewport.clientHeight - VIEWPORT_PADDING;
+  const fitZoom = Math.min(
+    1,
+    availWidth / DEFAULT_BOARD_SIZE.width,
+    availHeight / DEFAULT_BOARD_SIZE.height,
+  );
+  const scaledWidth = DEFAULT_BOARD_SIZE.width * fitZoom;
+  const scaledHeight = DEFAULT_BOARD_SIZE.height * fitZoom;
+
+  return {
+    zoom: fitZoom,
+    pan: {
+      x: Math.max(24, (viewport.clientWidth - scaledWidth) / 2),
+      y: Math.max(24, (viewport.clientHeight - scaledHeight) / 2),
+    },
+  };
+}
 
 export function BoardShell({
   boardId,
@@ -45,6 +66,7 @@ export function BoardShell({
   const viewportRef = useRef<HTMLDivElement>(null);
   const [boardName, setBoardName] = useState(initialBoardName);
   const [links, setLinks] = useState(initialLinks);
+  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null);
   const [handToolActive, setHandToolActive] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -78,13 +100,9 @@ export function BoardShell({
       return;
     }
 
-    const offsetX = (viewport.clientWidth - DEFAULT_BOARD_SIZE.width) / 2;
-    const offsetY = (viewport.clientHeight - DEFAULT_BOARD_SIZE.height) / 2;
-
-    setPan({
-      x: Math.max(32, offsetX),
-      y: Math.max(32, offsetY),
-    });
+    const initial = getInitialViewportState(viewport);
+    setPan(initial.pan);
+    setZoom(initial.zoom);
   }, []);
 
   useEffect(() => {
@@ -95,6 +113,10 @@ export function BoardShell({
     }
 
     const handleWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+      }
+
       if (!handToolActiveRef.current) {
         return;
       }
@@ -214,34 +236,44 @@ export function BoardShell({
     };
 
     setLinks((current) => [...current, tempLink]);
+    setSelectedLinkId(tempId);
 
     void createBoardLinkAction(boardId, x, y)
       .then((link) => {
         setLinks((current) =>
           current.map((item) => (item.id === tempId ? link : item)),
         );
+        setSelectedLinkId(link.id);
       })
       .catch(() => {
         setLinks((current) => current.filter((item) => item.id !== tempId));
+        setSelectedLinkId(null);
       });
   };
 
   const handleViewportPointerDown = (
     event: React.PointerEvent<HTMLDivElement>,
   ) => {
-    if (!handToolActive || event.button !== 0) {
+    if (handToolActive) {
+      if (event.button !== 0) {
+        return;
+      }
+
+      panSession.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        panX: pan.x,
+        panY: pan.y,
+      };
+
+      event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
 
-    panSession.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      panX: pan.x,
-      panY: pan.y,
-    };
-
-    event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.target === event.currentTarget) {
+      setSelectedLinkId(null);
+    }
   };
 
   const handleViewportPointerMove = (
@@ -277,7 +309,10 @@ export function BoardShell({
       <BoardSidebar
         backHref={backHref}
         handToolActive={handToolActive}
-        onToggleHandTool={() => setHandToolActive((active) => !active)}
+        onToggleHandTool={() => {
+          setHandToolActive((active) => !active);
+          setSelectedLinkId(null);
+        }}
       />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
@@ -300,7 +335,7 @@ export function BoardShell({
           onPointerCancel={handleViewportPointerUp}
         >
           <div
-            className="absolute top-0 left-0"
+            className="absolute top-0 left-0 will-change-transform"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "0 0",
@@ -327,8 +362,10 @@ export function BoardShell({
                 <BoardLinkCard
                   key={link.id}
                   link={link}
+                  selected={selectedLinkId === link.id}
                   selectMode={!handToolActive}
                   screenToWorld={screenToWorld}
+                  onSelect={setSelectedLinkId}
                   onMovePreview={previewLinkPosition}
                   onMoveCommit={commitLinkPosition}
                   onRename={renameBoard}
