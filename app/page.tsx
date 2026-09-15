@@ -1,22 +1,13 @@
-import { BoardShell } from "@/components/board-shell";
-import { getBoardPageData, getOrCreateRootBoard } from "@/lib/boards";
+const BOARD_WIDTH = 1280;
+const BOARD_HEIGHT = 720;
 
-export default async function Home() {
-  const rootBoard = await getOrCreateRootBoard();
-  const pageData = await getBoardPageData(rootBoard.id);
-
-  if (!pageData) {
-    return null;
-  }
-
+export default function Home() {
   return (
-    <BoardShell
-      key={pageData.board.id}
-      boardId={pageData.board.id}
-      boardName={pageData.board.name}
-      isHome
-      backHref={null}
-      initialLinks={pageData.links}
-    />
+    <main className="flex h-dvh items-center justify-center bg-[#e8e8e8]">
+      <div
+        className="board-surface border border-[#d4d4d4] bg-[#fafafa] shadow-sm"
+        style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
+      />
+    </main>
   );
 }

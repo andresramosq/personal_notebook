@@ -3,10 +3,6 @@
 :root {
   --background: #fafafa;
   --foreground: #1a1a1a;
-  --muted: #737373;
-  --border: #e5e5e5;
-  --surface: #ffffff;
-  --canvas: #fafafa;
 }
 
 @theme inline {
@@ -37,42 +33,4 @@ body {
   background-color: #fafafa;
   background-image: radial-gradient(rgba(120, 98, 72, 0.08) 0.8px, transparent 0.8px);
   background-size: 24px 24px;
-}
-
-.board-canvas {
-  background: #ebebeb;
-}
-
-.board-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 4px 16px rgba(0, 0, 0, 0.04);
-}
-
-.board-card:hover {
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.05),
-    0 8px 24px rgba(0, 0, 0, 0.06);
-}
-
-.board-card-preview {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-
-.sidebar-btn {
-  color: #525252;
-  transition: background-color 120ms ease;
-}
-
-.sidebar-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.sidebar-btn:disabled {
-  color: #d4d4d4;
-  cursor: default;
 }
