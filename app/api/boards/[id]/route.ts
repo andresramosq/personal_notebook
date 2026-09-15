@@ -10,7 +10,10 @@ export async function GET(_request: Request, context: RouteContext) {
   const board = await getBoardWithLinks(id);
 
   if (!board) {
-    return NextResponse.json({ error: "Pizarra no encontrada" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Pizarra no encontrada" },
+      { status: 404 },
+    );
   }
 
   return NextResponse.json({
@@ -34,7 +37,10 @@ export async function POST(request: Request, context: RouteContext) {
   const parentBoard = await getBoardWithLinks(id);
 
   if (!parentBoard) {
-    return NextResponse.json({ error: "Pizarra no encontrada" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Pizarra no encontrada" },
+      { status: 404 },
+    );
   }
 
   const link = await createBoardLink(id, body.x, body.y);

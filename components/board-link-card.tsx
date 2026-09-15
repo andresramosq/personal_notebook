@@ -2,7 +2,6 @@
 
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
-import { BoardIcon } from "@/components/board-sidebar";
 import type { BoardLinkItem } from "@/components/board-shell";
 
 type BoardLinkCardProps = {
@@ -40,11 +39,8 @@ export function BoardLinkCard({
           return;
         }
 
-        const x = event.clientX - rect.left;
-        const y = event.clientY - rect.top;
-
+        onMove(link.id, event.clientX - rect.left, event.clientY - rect.top);
         movedRef.current = false;
-        onMove(link.id, x, y);
       }}
       onClick={() => {
         if (movedRef.current) {
@@ -53,13 +49,11 @@ export function BoardLinkCard({
 
         router.push(`/pizarra/${link.targetBoardId}`);
       }}
-      className="absolute w-44 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-2xl border border-[#e2d9cc] bg-[#fffdf9] p-3 shadow-[0_10px_30px_rgba(47,42,36,0.08)] transition-[box-shadow,border-color] hover:border-[#cfc4b3] hover:shadow-[0_14px_34px_rgba(47,42,36,0.12)] active:cursor-grabbing"
+      className="board-card absolute h-[7.5rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing"
       style={{ left: link.x, top: link.y }}
     >
-      <div className="mb-3 flex size-10 items-center justify-center rounded-xl bg-[#f5f0e8] text-[#7a6f61]">
-        <BoardIcon className="size-5" />
-      </div>
-      <p className="text-sm font-medium text-[#3d3830]">Pizarra</p>
+      <div className="h-2 border-b border-[#ececec] bg-[#f5f5f5]" />
+      <div className="h-full bg-white" />
     </div>
   );
 }

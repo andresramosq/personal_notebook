@@ -19,7 +19,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   const result = await updateBoardLinkPosition(linkId, id, body.x, body.y);
 
   if (result.count === 0) {
-    return NextResponse.json({ error: "Enlace no encontrado" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Enlace no encontrado" },
+      { status: 404 },
+    );
   }
 
   return NextResponse.json({
