@@ -7,14 +7,16 @@ import type { BoardLinkItem } from "@/components/board-shell";
 
 type BoardLinkCardProps = {
   link: BoardLinkItem;
-  getCanvasRect: () => DOMRect | null;
+  interactionEnabled: boolean;
+  screenToWorld: (clientX: number, clientY: number) => { x: number; y: number };
   onMove: (linkId: string, x: number, y: number) => void;
   onRename: (targetBoardId: string, name: string) => void;
 };
 
 export function BoardLinkCard({
   link,
-  getCanvasRect,
+  interactionEnabled,
+  screenToWorld,
   onMove,
   onRename,
 }: BoardLinkCardProps) {
@@ -23,7 +25,7 @@ export function BoardLinkCard({
 
   return (
     <div
-      draggable
+      draggable={interactionEnabled}
       onDragStart={() => {
         movedRef.current = false;
       }}
@@ -31,33 +33,36 @@ export function BoardLinkCard({
         movedRef.current = true;
       }}
       onDragEnd={(event) => {
-        if (!movedRef.current) {
+        if (!interactionEnabled || !movedRef.current) {
           return;
         }
 
-        const rect = getCanvasRect();
-
-        if (!rect || (event.clientX === 0 && event.clientY === 0)) {
+        if (event.clientX === 0 && event.clientY === 0) {
           movedRef.current = false;
           return;
         }
 
-        onMove(link.id, event.clientX - rect.left, event.clientY - rect.top);
+        const { x, y } = screenToWorld(event.clientX, event.clientY);
+        onMove(link.id, x, y);
         movedRef.current = false;
       }}
       onMouseEnter={() => {
-        if (!link.pending) {
+        if (interactionEnabled && !link.pending) {
           router.prefetch(`/pizarra/${link.targetBoardId}`);
         }
       }}
       onClick={() => {
-        if (link.pending || movedRef.current) {
+        if (!interactionEnabled || link.pending || movedRef.current) {
           return;
         }
 
         router.push(`/pizarra/${link.targetBoardId}`);
       }}
-      className="board-card absolute h-[7.5rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 cursor-grab overflow-hidden rounded-lg active:cursor-grabbing"
+      className={`board-card absolute h-[7.5rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg ${
+        interactionEnabled
+          ? "cursor-grab active:cursor-grabbing"
+          : "pointer-events-none"
+      }`}
       style={{ left: link.x, top: link.y }}
     >
       <div className="flex h-7 items-center border-b border-[#ececec] bg-[#fafafa] px-2">
