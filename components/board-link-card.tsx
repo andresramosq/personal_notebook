@@ -13,6 +13,8 @@ type BoardLinkCardProps = {
   onRename: (targetBoardId: string, name: string) => void;
 };
 
+const DRAG_THRESHOLD = 5;
+
 export function BoardLinkCard({
   link,
   interactionEnabled,
@@ -21,51 +23,94 @@ export function BoardLinkCard({
   onRename,
 }: BoardLinkCardProps) {
   const router = useRouter();
-  const movedRef = useRef(false);
+  const pointerSession = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    dragging: boolean;
+  } | null>(null);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!interactionEnabled || link.pending) {
+      return;
+    }
+
+    pointerSession.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+    };
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.stopPropagation();
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const session = pointerSession.current;
+
+    if (
+      !session ||
+      session.pointerId !== event.pointerId ||
+      !interactionEnabled
+    ) {
+      return;
+    }
+
+    const deltaX = event.clientX - session.startX;
+    const deltaY = event.clientY - session.startY;
+
+    if (
+      !session.dragging &&
+      Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD
+    ) {
+      session.dragging = true;
+    }
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const session = pointerSession.current;
+
+    if (!session || session.pointerId !== event.pointerId) {
+      return;
+    }
+
+    pointerSession.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+
+    if (session.dragging) {
+      if (event.clientX !== 0 || event.clientY !== 0) {
+        const { x, y } = screenToWorld(event.clientX, event.clientY);
+        onMove(link.id, x, y);
+      }
+      return;
+    }
+
+    router.push(`/pizarra/${link.targetBoardId}`);
+  };
 
   return (
     <div
-      draggable={interactionEnabled}
-      onDragStart={() => {
-        movedRef.current = false;
-      }}
-      onDrag={() => {
-        movedRef.current = true;
-      }}
-      onDragEnd={(event) => {
-        if (!interactionEnabled || !movedRef.current) {
-          return;
-        }
-
-        if (event.clientX === 0 && event.clientY === 0) {
-          movedRef.current = false;
-          return;
-        }
-
-        const { x, y } = screenToWorld(event.clientX, event.clientY);
-        onMove(link.id, x, y);
-        movedRef.current = false;
-      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onMouseEnter={() => {
         if (interactionEnabled && !link.pending) {
           router.prefetch(`/pizarra/${link.targetBoardId}`);
         }
       }}
-      onClick={() => {
-        if (!interactionEnabled || link.pending || movedRef.current) {
-          return;
-        }
-
-        router.push(`/pizarra/${link.targetBoardId}`);
-      }}
-      className={`board-card absolute h-[7.5rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg ${
+      className={`board-card absolute h-[7.5rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg touch-none ${
         interactionEnabled
-          ? "cursor-grab active:cursor-grabbing"
+          ? "cursor-pointer"
           : "pointer-events-none"
       }`}
       style={{ left: link.x, top: link.y }}
     >
-      <div className="flex h-7 items-center border-b border-[#ececec] bg-[#fafafa] px-2">
+      <div
+        className="flex h-7 items-center border-b border-[#ececec] bg-[#fafafa] px-2"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
         <EditableName
           value={link.name}
           onSave={(name) => onRename(link.targetBoardId, name)}

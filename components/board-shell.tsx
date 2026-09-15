@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createBoardLinkAction,
   updateBoardLinkPositionAction,
@@ -9,9 +9,9 @@ import {
 import { BoardLinkCard } from "@/components/board-link-card";
 import { BoardSidebar, PIZARRA_DRAG_TYPE } from "@/components/board-sidebar";
 import {
-  BOARD_SIZE,
   canPlaceBoardCard,
   clampBoardPosition,
+  type BoardSize,
 } from "@/lib/board-config";
 
 export type BoardLinkItem = {
@@ -49,6 +49,7 @@ export function BoardShell({
   const viewportRef = useRef<HTMLDivElement>(null);
   const [boardName, setBoardName] = useState(initialBoardName);
   const [links, setLinks] = useState(initialLinks);
+  const [boardSize, setBoardSize] = useState<BoardSize>({ width: 0, height: 0 });
   const [handToolActive, setHandToolActive] = useState(false);
   const [pan, setPan] = useState<PanState>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -59,6 +60,28 @@ export function BoardShell({
     panX: number;
     panY: number;
   } | null>(null);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+
+    if (!viewport) {
+      return;
+    }
+
+    const updateSize = () => {
+      setBoardSize({
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      });
+    };
+
+    updateSize();
+
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, []);
 
   const screenToWorld = useCallback(
     (clientX: number, clientY: number) => {
@@ -97,7 +120,11 @@ export function BoardShell({
   };
 
   const updateLinkPosition = (linkId: string, x: number, y: number) => {
-    const clamped = clampBoardPosition(x, y);
+    if (boardSize.width === 0 || boardSize.height === 0) {
+      return;
+    }
+
+    const clamped = clampBoardPosition(x, y, boardSize);
 
     setLinks((current) =>
       current.map((link) =>
@@ -119,14 +146,16 @@ export function BoardShell({
     if (
       handToolActive ||
       !event.dataTransfer.getData(PIZARRA_DRAG_TYPE) ||
-      !viewportRef.current
+      !viewportRef.current ||
+      boardSize.width === 0 ||
+      boardSize.height === 0
     ) {
       return;
     }
 
     const { x, y } = screenToWorld(event.clientX, event.clientY);
 
-    if (!canPlaceBoardCard(x, y)) {
+    if (!canPlaceBoardCard(x, y, boardSize)) {
       return;
     }
 
@@ -216,7 +245,7 @@ export function BoardShell({
   };
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-[#fafafa]">
+    <div className="flex h-dvh w-full overflow-hidden bg-[#ebebeb]">
       <BoardSidebar
         backHref={backHref}
         handToolActive={handToolActive}
@@ -232,7 +261,7 @@ export function BoardShell({
 
         <div
           ref={viewportRef}
-          className={`board-canvas relative min-h-0 flex-1 overflow-hidden ${
+          className={`relative min-h-0 flex-1 overflow-hidden bg-[#ebebeb] ${
             handToolActive ? "cursor-grab active:cursor-grabbing" : ""
           }`}
           onDragOver={(event) => {
@@ -250,26 +279,28 @@ export function BoardShell({
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
         >
-          <div
-            className="relative bg-[#fafafa]"
-            style={{
-              width: BOARD_SIZE.width,
-              height: BOARD_SIZE.height,
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: "0 0",
-            }}
-          >
-            {links.map((link) => (
-              <BoardLinkCard
-                key={link.id}
-                link={link}
-                interactionEnabled={!handToolActive}
-                screenToWorld={screenToWorld}
-                onMove={updateLinkPosition}
-                onRename={renameBoard}
-              />
-            ))}
-          </div>
+          {boardSize.width > 0 && boardSize.height > 0 ? (
+            <div
+              className="board-surface absolute top-0 left-0 border border-[#d4d4d4] bg-[#fafafa] shadow-sm"
+              style={{
+                width: boardSize.width,
+                height: boardSize.height,
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: "0 0",
+              }}
+            >
+              {links.map((link) => (
+                <BoardLinkCard
+                  key={link.id}
+                  link={link}
+                  interactionEnabled={!handToolActive}
+                  screenToWorld={screenToWorld}
+                  onMove={updateLinkPosition}
+                  onRename={renameBoard}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
