@@ -37,38 +37,40 @@ type BoardSidebarProps = {
 export function BoardSidebar({ backHref }: BoardSidebarProps) {
   return (
     <aside className="flex w-48 shrink-0 flex-col border-r border-[#ececec] bg-white">
-      <div className="flex h-12 items-center border-b border-[#ececec] px-3">
-        {backHref ? (
-          <Link
-            href={backHref}
-            aria-label="Atrás"
-            className="sidebar-btn flex size-8 items-center justify-center rounded-md"
-          >
-            <ChevronLeftIcon />
-          </Link>
-        ) : (
-          <button
-            type="button"
-            disabled
-            aria-label="Atrás"
-            className="sidebar-btn flex size-8 items-center justify-center rounded-md"
-          >
-            <ChevronLeftIcon />
-          </button>
-        )}
-      </div>
+      <div className="border-b border-[#ececec]">
+        <div className="flex h-12 items-center px-3">
+          {backHref ? (
+            <Link
+              href={backHref}
+              aria-label="Atrás"
+              className="sidebar-btn flex size-8 items-center justify-center rounded-md"
+            >
+              <ChevronLeftIcon />
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              aria-label="Atrás"
+              className="sidebar-btn flex size-8 items-center justify-center rounded-md"
+            >
+              <ChevronLeftIcon />
+            </button>
+          )}
+        </div>
 
-      <div className="p-3">
-        <div
-          draggable
-          onDragStart={(event) => {
-            event.dataTransfer.setData(PIZARRA_DRAG_TYPE, "pizarra");
-            event.dataTransfer.effectAllowed = "copy";
-          }}
-          className="group cursor-grab rounded-lg p-2 transition-colors hover:bg-[#f5f5f5] active:cursor-grabbing"
-        >
-          <BoardPreview className="h-20 shadow-sm transition-shadow group-hover:shadow-md" />
-          <p className="mt-2 text-center text-[12px] text-[#737373]">Pizarra</p>
+        <div className="px-3 pb-3">
+          <div
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.setData(PIZARRA_DRAG_TYPE, "pizarra");
+              event.dataTransfer.effectAllowed = "copy";
+            }}
+            className="group cursor-grab rounded-lg p-2 transition-colors hover:bg-[#f5f5f5] active:cursor-grabbing"
+          >
+            <BoardPreview className="h-20 shadow-sm transition-shadow group-hover:shadow-md" />
+            <p className="mt-2 text-center text-[12px] text-[#737373]">Pizarra</p>
+          </div>
         </div>
       </div>
     </aside>

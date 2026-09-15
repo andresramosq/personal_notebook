@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 export type BoardLinkItem = {
   id: string;
   targetBoardId: string;
+  name: string;
   x: number;
   y: number;
 };
@@ -28,6 +29,11 @@ export async function getBoardWithLinks(boardId: string) {
           targetBoardId: true,
           x: true,
           y: true,
+          targetBoard: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
     },
@@ -40,10 +46,10 @@ export async function createBoardLink(
   y: number,
 ) {
   return prisma.$transaction(async (tx) => {
+    const name = `Pizarra ${(await tx.board.count()) + 1}`;
+
     const targetBoard = await tx.board.create({
-      data: {
-        name: "Pizarra",
-      },
+      data: { name },
     });
 
     const link = await tx.boardLink.create({
@@ -61,7 +67,18 @@ export async function createBoardLink(
       },
     });
 
-    return link;
+    return {
+      ...link,
+      name: targetBoard.name,
+    };
+  });
+}
+
+export async function updateBoardName(boardId: string, name: string) {
+  return prisma.board.update({
+    where: { id: boardId },
+    data: { name },
+    select: { id: true, name: true },
   });
 }
 
@@ -108,4 +125,24 @@ export function getBackHref(
   }
 
   return `/pizarra/${parentBoard.id}`;
+}
+
+type BoardLinkRecord = {
+  id: string;
+  targetBoardId: string;
+  x: number;
+  y: number;
+  targetBoard: {
+    name: string;
+  };
+};
+
+export function formatBoardLinks(links: BoardLinkRecord[]): BoardLinkItem[] {
+  return links.map((link) => ({
+    id: link.id,
+    targetBoardId: link.targetBoardId,
+    name: link.targetBoard.name,
+    x: link.x,
+    y: link.y,
+  }));
 }

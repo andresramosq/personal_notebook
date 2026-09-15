@@ -3,10 +3,12 @@
 import { useRef, useState } from "react";
 import { BoardLinkCard } from "@/components/board-link-card";
 import { BoardSidebar, PIZARRA_DRAG_TYPE } from "@/components/board-sidebar";
+import { EditableName } from "@/components/editable-name";
 
 export type BoardLinkItem = {
   id: string;
   targetBoardId: string;
+  name: string;
   x: number;
   y: number;
 };
@@ -20,16 +22,41 @@ type BoardShellProps = {
 
 export function BoardShell({
   boardId,
-  boardName,
+  boardName: initialBoardName,
   backHref,
   initialLinks,
 }: BoardShellProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [boardName, setBoardName] = useState(initialBoardName);
   const [links, setLinks] = useState(initialLinks);
+
+  const renameBoard = async (targetBoardId: string, name: string) => {
+    const response = await fetch(`/api/boards/${targetBoardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    if (targetBoardId === boardId) {
+      setBoardName(name);
+    }
+
+    setLinks((current) =>
+      current.map((link) =>
+        link.targetBoardId === targetBoardId ? { ...link, name } : link,
+      ),
+    );
+  };
 
   const updateLinkPosition = async (linkId: string, x: number, y: number) => {
     setLinks((current) =>
-      current.map((link) => (link.id === linkId ? { ...link, x, y } : link)),
+      current.map((link) =>
+        link.id === linkId ? { ...link, x, y } : link,
+      ),
     );
 
     await fetch(`/api/boards/${boardId}/links/${linkId}`, {
@@ -80,9 +107,14 @@ export function BoardShell({
             void handleDrop(event);
           }}
         >
-          <p className="pointer-events-none absolute top-5 left-6 text-[13px] text-[#737373]">
-            {boardName}
-          </p>
+          <div className="absolute top-5 left-6 max-w-xs">
+            <EditableName
+              value={boardName}
+              onSave={(name) => renameBoard(boardId, name)}
+              className="text-[13px] text-[#737373] hover:text-[#404040]"
+              inputClassName="rounded border border-[#d4d4d4] bg-white px-2 py-1 text-[13px] text-[#404040] outline-none focus:border-[#a3a3a3]"
+            />
+          </div>
 
           {links.map((link) => (
             <BoardLinkCard
@@ -92,6 +124,7 @@ export function BoardShell({
                 canvasRef.current?.getBoundingClientRect() ?? null
               }
               onMove={updateLinkPosition}
+              onRename={renameBoard}
             />
           ))}
         </div>

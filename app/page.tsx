@@ -1,5 +1,5 @@
 import { BoardShell } from "@/components/board-shell";
-import { getBoardWithLinks, getOrCreateRootBoard } from "@/lib/boards";
+import { formatBoardLinks, getBoardWithLinks, getOrCreateRootBoard } from "@/lib/boards";
 
 export default async function Home() {
   const board = await getOrCreateRootBoard();
@@ -10,7 +10,7 @@ export default async function Home() {
       boardId={board.id}
       boardName={board.name}
       backHref={null}
-      initialLinks={boardWithLinks?.links ?? []}
+      initialLinks={formatBoardLinks(boardWithLinks?.links ?? [])}
     />
   );
 }

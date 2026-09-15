@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import { BoardShell } from "@/components/board-shell";
-import { getBackHref, getBoardWithLinks, getParentBoard } from "@/lib/boards";
+import {
+  formatBoardLinks,
+  getBackHref,
+  getBoardWithLinks,
+  getParentBoard,
+} from "@/lib/boards";
 
 type PizarraPageProps = {
   params: Promise<{ id: string }>;
@@ -21,7 +26,7 @@ export default async function PizarraPage({ params }: PizarraPageProps) {
       boardId={board.id}
       boardName={board.name}
       backHref={getBackHref(parentBoard)}
-      initialLinks={board.links}
+      initialLinks={formatBoardLinks(board.links)}
     />
   );
 }
