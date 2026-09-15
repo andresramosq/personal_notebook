@@ -8,6 +8,11 @@ import {
 } from "@/app/actions/boards";
 import { BoardLinkCard } from "@/components/board-link-card";
 import { BoardSidebar, PIZARRA_DRAG_TYPE } from "@/components/board-sidebar";
+import {
+  BOARD_SIZE,
+  canPlaceBoardCard,
+  clampBoardPosition,
+} from "@/lib/board-config";
 
 export type BoardLinkItem = {
   id: string;
@@ -92,13 +97,20 @@ export function BoardShell({
   };
 
   const updateLinkPosition = (linkId: string, x: number, y: number) => {
+    const clamped = clampBoardPosition(x, y);
+
     setLinks((current) =>
       current.map((link) =>
-        link.id === linkId ? { ...link, x, y } : link,
+        link.id === linkId ? { ...link, ...clamped } : link,
       ),
     );
 
-    void updateBoardLinkPositionAction(linkId, boardId, x, y);
+    void updateBoardLinkPositionAction(
+      linkId,
+      boardId,
+      clamped.x,
+      clamped.y,
+    );
   };
 
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -113,6 +125,11 @@ export function BoardShell({
     }
 
     const { x, y } = screenToWorld(event.clientX, event.clientY);
+
+    if (!canPlaceBoardCard(x, y)) {
+      return;
+    }
+
     const tempId = crypto.randomUUID();
     const tempLink: BoardLinkItem = {
       id: tempId,
@@ -234,8 +251,10 @@ export function BoardShell({
           onPointerCancel={handlePointerUp}
         >
           <div
-            className="relative h-full w-full"
+            className="relative bg-[#fafafa]"
             style={{
+              width: BOARD_SIZE.width,
+              height: BOARD_SIZE.height,
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               transformOrigin: "0 0",
             }}
