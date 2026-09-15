@@ -13,6 +13,7 @@ export default async function Home() {
     <BoardShell
       boardId={pageData.board.id}
       boardName={pageData.board.name}
+      isHome
       backHref={null}
       initialLinks={pageData.links}
     />

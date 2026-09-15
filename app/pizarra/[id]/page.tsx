@@ -18,6 +18,7 @@ export default async function PizarraPage({ params }: PizarraPageProps) {
     <BoardShell
       boardId={pageData.board.id}
       boardName={pageData.board.name}
+      isHome={false}
       backHref={getBackHref(pageData.parentBoard)}
       initialLinks={pageData.links}
     />

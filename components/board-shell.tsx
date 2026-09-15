@@ -8,7 +8,6 @@ import {
 } from "@/app/actions/boards";
 import { BoardLinkCard } from "@/components/board-link-card";
 import { BoardSidebar, PIZARRA_DRAG_TYPE } from "@/components/board-sidebar";
-import { EditableName } from "@/components/editable-name";
 
 export type BoardLinkItem = {
   id: string;
@@ -22,6 +21,7 @@ export type BoardLinkItem = {
 type BoardShellProps = {
   boardId: string;
   boardName: string;
+  isHome: boolean;
   backHref: string | null;
   initialLinks: BoardLinkItem[];
 };
@@ -37,6 +37,7 @@ const MAX_ZOOM = 3;
 export function BoardShell({
   boardId,
   boardName: initialBoardName,
+  isHome,
   backHref,
   initialLinks,
 }: BoardShellProps) {
@@ -205,10 +206,16 @@ export function BoardShell({
         onToggleHandTool={() => setHandToolActive((active) => !active)}
       />
 
-      <div className="relative min-w-0 flex-1">
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <header className="flex h-12 shrink-0 items-center border-b border-[#ececec] bg-white px-5">
+          <h1 className="text-[13px] font-medium text-[#404040]">
+            {isHome ? "Home" : boardName}
+          </h1>
+        </header>
+
         <div
           ref={viewportRef}
-          className={`board-canvas relative h-full w-full overflow-hidden ${
+          className={`board-canvas relative min-h-0 flex-1 overflow-hidden ${
             handToolActive ? "cursor-grab active:cursor-grabbing" : ""
           }`}
           onDragOver={(event) => {
@@ -233,19 +240,6 @@ export function BoardShell({
               transformOrigin: "0 0",
             }}
           >
-            <div
-              className={`absolute top-5 left-6 max-w-xs ${
-                handToolActive ? "pointer-events-none" : ""
-              }`}
-            >
-              <EditableName
-                value={boardName}
-                onSave={(name) => renameBoard(boardId, name)}
-                className="text-[13px] text-[#737373] hover:text-[#404040]"
-                inputClassName="rounded border border-[#d4d4d4] bg-white px-2 py-1 text-[13px] text-[#404040] outline-none focus:border-[#a3a3a3]"
-              />
-            </div>
-
             {links.map((link) => (
               <BoardLinkCard
                 key={link.id}
