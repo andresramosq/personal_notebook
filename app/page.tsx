@@ -8,6 +8,7 @@ export default async function Home() {
   return (
     <BoardShell
       boardId={board.id}
+      boardName={board.name}
       isHome
       initialLinks={boardWithLinks?.links ?? []}
     />

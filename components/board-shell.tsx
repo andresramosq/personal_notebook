@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { BoardLinkCard } from "@/components/board-link-card";
 import { BoardSidebar, PIZARRA_DRAG_TYPE } from "@/components/board-sidebar";
 
 export type BoardLinkItem = {
@@ -13,24 +13,44 @@ export type BoardLinkItem = {
 
 type BoardShellProps = {
   boardId: string;
+  boardName: string;
   isHome: boolean;
   initialLinks: BoardLinkItem[];
 };
 
-export function BoardShell({ boardId, isHome, initialLinks }: BoardShellProps) {
-  const router = useRouter();
+export function BoardShell({
+  boardId,
+  boardName,
+  isHome,
+  initialLinks,
+}: BoardShellProps) {
+  const canvasRef = useRef<HTMLDivElement>(null);
   const [links, setLinks] = useState(initialLinks);
+
+  const updateLinkPosition = async (linkId: string, x: number, y: number) => {
+    setLinks((current) =>
+      current.map((link) =>
+        link.id === linkId ? { ...link, x, y } : link,
+      ),
+    );
+
+    await fetch(`/api/boards/${boardId}/links/${linkId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ x, y }),
+    });
+  };
 
   const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
 
-    if (!event.dataTransfer.getData(PIZARRA_DRAG_TYPE)) {
+    if (!event.dataTransfer.getData(PIZARRA_DRAG_TYPE) || !canvasRef.current) {
       return;
     }
 
-    const canvas = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - canvas.left;
-    const y = event.clientY - canvas.top;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
 
     const response = await fetch(`/api/boards/${boardId}`, {
       method: "POST",
@@ -47,30 +67,36 @@ export function BoardShell({ boardId, isHome, initialLinks }: BoardShellProps) {
   };
 
   return (
-    <div className="flex h-dvh w-full">
+    <div className="flex h-dvh w-full overflow-hidden bg-[#f5f2eb]">
       <BoardSidebar isHome={isHome} />
 
-      <div
-        className="relative flex-1 bg-[#f7f3eb]"
-        onDragOver={(event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "copy";
-        }}
-        onDrop={(event) => {
-          void handleDrop(event);
-        }}
-      >
-        {links.map((link) => (
-          <button
-            key={link.id}
-            type="button"
-            onClick={() => router.push(`/pizarra/${link.targetBoardId}`)}
-            className="absolute h-28 w-40 -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-[#d4cbb8] bg-[#faf7f2] text-sm text-[#3d3830] shadow-sm transition-colors hover:border-[#b8aa92] hover:bg-white"
-            style={{ left: link.x, top: link.y }}
-          >
-            Pizarra
-          </button>
-        ))}
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-8">
+          <h1 className="border-b border-[#ddd3c4] px-1 pb-1 text-lg font-medium tracking-tight text-[#3d3830]">
+            {boardName}
+          </h1>
+        </header>
+
+        <div
+          ref={canvasRef}
+          className="board-surface relative h-full w-full"
+          onDragOver={(event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+          }}
+          onDrop={(event) => {
+            void handleDrop(event);
+          }}
+        >
+          {links.map((link) => (
+            <BoardLinkCard
+              key={link.id}
+              link={link}
+              getCanvasRect={() => canvasRef.current?.getBoundingClientRect() ?? null}
+              onMove={updateLinkPosition}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,11 @@ export default async function PizarraPage({ params }: PizarraPageProps) {
   }
 
   return (
-    <BoardShell boardId={board.id} isHome={false} initialLinks={board.links} />
+    <BoardShell
+      boardId={board.id}
+      boardName={board.name}
+      isHome={false}
+      initialLinks={board.links}
+    />
   );
 }

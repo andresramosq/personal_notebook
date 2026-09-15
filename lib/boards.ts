@@ -64,3 +64,18 @@ export async function createBoardLink(
     return link;
   });
 }
+
+export async function updateBoardLinkPosition(
+  linkId: string,
+  parentBoardId: string,
+  x: number,
+  y: number,
+) {
+  return prisma.boardLink.updateMany({
+    where: {
+      id: linkId,
+      parentBoardId,
+    },
+    data: { x, y },
+  });
+}
