@@ -19,14 +19,19 @@ function ChevronLeftIcon() {
   );
 }
 
-export function BoardPreview({ className }: { className?: string }) {
+function BoardIcon() {
   return (
-    <div
-      className={`board-card-preview overflow-hidden rounded-md ${className ?? ""}`}
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      className="size-4"
+      aria-hidden
     >
-      <div className="h-2 border-b border-[#ececec] bg-[#f5f5f5]" />
-      <div className="min-h-12 flex-1 bg-white" />
-    </div>
+      <rect x="3.5" y="3.5" width="13" height="13" rx="2" />
+      <path d="M7 8h6M7 10.5h4" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -36,42 +41,36 @@ type BoardSidebarProps = {
 
 export function BoardSidebar({ backHref }: BoardSidebarProps) {
   return (
-    <aside className="flex w-48 shrink-0 flex-col border-r border-[#ececec] bg-white">
-      <div className="border-b border-[#ececec]">
-        <div className="flex h-12 items-center px-3">
-          {backHref ? (
-            <Link
-              href={backHref}
-              aria-label="Atrás"
-              className="sidebar-btn flex size-8 items-center justify-center rounded-md"
-            >
-              <ChevronLeftIcon />
-            </Link>
-          ) : (
-            <button
-              type="button"
-              disabled
-              aria-label="Atrás"
-              className="sidebar-btn flex size-8 items-center justify-center rounded-md"
-            >
-              <ChevronLeftIcon />
-            </button>
-          )}
-        </div>
+    <aside className="flex w-14 shrink-0 flex-col items-center border-r border-[#ececec] bg-white py-3">
+      {backHref ? (
+        <Link
+          href={backHref}
+          aria-label="Atrás"
+          className="sidebar-btn flex size-9 items-center justify-center rounded-md"
+        >
+          <ChevronLeftIcon />
+        </Link>
+      ) : (
+        <button
+          type="button"
+          disabled
+          aria-label="Atrás"
+          className="sidebar-btn flex size-9 items-center justify-center rounded-md"
+        >
+          <ChevronLeftIcon />
+        </button>
+      )}
 
-        <div className="px-3 pb-3">
-          <div
-            draggable
-            onDragStart={(event) => {
-              event.dataTransfer.setData(PIZARRA_DRAG_TYPE, "pizarra");
-              event.dataTransfer.effectAllowed = "copy";
-            }}
-            className="group cursor-grab rounded-lg p-2 transition-colors hover:bg-[#f5f5f5] active:cursor-grabbing"
-          >
-            <BoardPreview className="h-20 shadow-sm transition-shadow group-hover:shadow-md" />
-            <p className="mt-2 text-center text-[12px] text-[#737373]">Pizarra</p>
-          </div>
-        </div>
+      <div
+        draggable
+        title="Pizarra"
+        onDragStart={(event) => {
+          event.dataTransfer.setData(PIZARRA_DRAG_TYPE, "pizarra");
+          event.dataTransfer.effectAllowed = "copy";
+        }}
+        className="sidebar-btn mt-3 flex size-9 cursor-grab items-center justify-center rounded-md active:cursor-grabbing"
+      >
+        <BoardIcon />
       </div>
     </aside>
   );
