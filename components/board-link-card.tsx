@@ -1,124 +1,124 @@
 "use client";
 
+import Link from "next/link";
 import { useRef } from "react";
-import { useRouter } from "next/navigation";
 import { EditableName } from "@/components/editable-name";
 import type { BoardLinkItem } from "@/components/board-shell";
 
 type BoardLinkCardProps = {
   link: BoardLinkItem;
-  interactionEnabled: boolean;
+  selectMode: boolean;
   screenToWorld: (clientX: number, clientY: number) => { x: number; y: number };
-  onMove: (linkId: string, x: number, y: number) => void;
+  onMovePreview: (linkId: string, x: number, y: number) => void;
+  onMoveCommit: (linkId: string, x: number, y: number) => void;
   onRename: (targetBoardId: string, name: string) => void;
 };
 
-const DRAG_THRESHOLD = 5;
+function DragHandleIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className="size-3.5 opacity-40"
+      aria-hidden
+    >
+      <circle cx="5" cy="4" r="1" />
+      <circle cx="11" cy="4" r="1" />
+      <circle cx="5" cy="8" r="1" />
+      <circle cx="11" cy="8" r="1" />
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="11" cy="12" r="1" />
+    </svg>
+  );
+}
 
 export function BoardLinkCard({
   link,
-  interactionEnabled,
+  selectMode,
   screenToWorld,
-  onMove,
+  onMovePreview,
+  onMoveCommit,
   onRename,
 }: BoardLinkCardProps) {
-  const router = useRouter();
-  const pointerSession = useRef<{
-    pointerId: number;
-    startX: number;
-    startY: number;
-    dragging: boolean;
-  } | null>(null);
+  const draggingRef = useRef(false);
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!interactionEnabled || link.pending) {
+  const handleGripPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!selectMode || link.pending) {
       return;
     }
 
-    pointerSession.current = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      dragging: false,
-    };
-
+    draggingRef.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
     event.stopPropagation();
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const session = pointerSession.current;
-
-    if (
-      !session ||
-      session.pointerId !== event.pointerId ||
-      !interactionEnabled
-    ) {
+  const handleGripPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current || !selectMode) {
       return;
     }
 
-    const deltaX = event.clientX - session.startX;
-    const deltaY = event.clientY - session.startY;
-
-    if (
-      !session.dragging &&
-      Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD
-    ) {
-      session.dragging = true;
-    }
+    const { x, y } = screenToWorld(event.clientX, event.clientY);
+    onMovePreview(link.id, x, y);
   };
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    const session = pointerSession.current;
-
-    if (!session || session.pointerId !== event.pointerId) {
+  const finishDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) {
       return;
     }
 
-    pointerSession.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    draggingRef.current = false;
 
-    if (session.dragging) {
-      if (event.clientX !== 0 || event.clientY !== 0) {
-        const { x, y } = screenToWorld(event.clientX, event.clientY);
-        onMove(link.id, x, y);
-      }
-      return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
 
-    router.push(`/pizarra/${link.targetBoardId}`);
+    const { x, y } = screenToWorld(event.clientX, event.clientY);
+    onMoveCommit(link.id, x, y);
   };
 
   return (
     <div
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      onMouseEnter={() => {
-        if (interactionEnabled && !link.pending) {
-          router.prefetch(`/pizarra/${link.targetBoardId}`);
-        }
-      }}
-      className={`board-card absolute h-[7.5rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg touch-none ${
-        interactionEnabled
-          ? "cursor-pointer"
-          : "pointer-events-none"
+      className={`board-card absolute h-[7.5rem] w-[11rem] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg ${
+        selectMode ? "" : "pointer-events-none"
       }`}
       style={{ left: link.x, top: link.y }}
     >
-      <div
-        className="flex h-7 items-center border-b border-[#ececec] bg-[#fafafa] px-2"
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <EditableName
-          value={link.name}
-          onSave={(name) => onRename(link.targetBoardId, name)}
-          className="w-full truncate text-left text-[11px] font-medium text-[#525252] hover:text-[#171717]"
-          inputClassName="w-full rounded border border-[#d4d4d4] bg-white px-1.5 py-0.5 text-[11px] text-[#404040] outline-none focus:border-[#a3a3a3]"
-        />
+      <div className="flex h-7 items-center border-b border-[#ececec] bg-[#fafafa]">
+        <div
+          onPointerDown={handleGripPointerDown}
+          onPointerMove={handleGripPointerMove}
+          onPointerUp={finishDrag}
+          onPointerCancel={finishDrag}
+          className={`flex h-full shrink-0 items-center px-1.5 ${
+            selectMode && !link.pending
+              ? "cursor-grab text-[#737373] active:cursor-grabbing"
+              : ""
+          }`}
+          aria-label="Mover pizarra"
+        >
+          <DragHandleIcon />
+        </div>
+        <div className="min-w-0 flex-1 px-1">
+          <EditableName
+            value={link.name}
+            onSave={(name) => onRename(link.targetBoardId, name)}
+            className="w-full truncate text-left text-[11px] font-medium text-[#525252] hover:text-[#171717]"
+            inputClassName="w-full rounded border border-[#d4d4d4] bg-white px-1.5 py-0.5 text-[11px] text-[#404040] outline-none focus:border-[#a3a3a3]"
+          />
+        </div>
       </div>
-      <div className="h-full bg-white" />
+
+      {selectMode && !link.pending ? (
+        <Link
+          href={`/pizarra/${link.targetBoardId}`}
+          prefetch
+          className="block h-[calc(100%-1.75rem)] bg-white transition-colors hover:bg-[#fcfcfc]"
+          aria-label={`Abrir ${link.name}`}
+        />
+      ) : (
+        <div className="h-[calc(100%-1.75rem)] bg-white" />
+      )}
     </div>
   );
 }

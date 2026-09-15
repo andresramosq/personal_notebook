@@ -11,7 +11,8 @@ import { BoardSidebar, PIZARRA_DRAG_TYPE } from "@/components/board-sidebar";
 import {
   canPlaceBoardCard,
   clampBoardPosition,
-  type BoardSize,
+  DEFAULT_BOARD_SIZE,
+  isPointInsideBoard,
 } from "@/lib/board-config";
 
 export type BoardLinkItem = {
@@ -31,13 +32,8 @@ type BoardShellProps = {
   initialLinks: BoardLinkItem[];
 };
 
-type PanState = {
-  x: number;
-  y: number;
-};
-
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 3;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2;
 
 export function BoardShell({
   boardId,
@@ -49,9 +45,8 @@ export function BoardShell({
   const viewportRef = useRef<HTMLDivElement>(null);
   const [boardName, setBoardName] = useState(initialBoardName);
   const [links, setLinks] = useState(initialLinks);
-  const [boardSize, setBoardSize] = useState<BoardSize>({ width: 0, height: 0 });
   const [handToolActive, setHandToolActive] = useState(false);
-  const [pan, setPan] = useState<PanState>({ x: 0, y: 0 });
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const panSession = useRef<{
     pointerId: number;
@@ -68,16 +63,19 @@ export function BoardShell({
       return;
     }
 
-    const updateSize = () => {
-      setBoardSize({
-        width: viewport.clientWidth,
-        height: viewport.clientHeight,
+    const centerBoard = () => {
+      const offsetX = (viewport.clientWidth - DEFAULT_BOARD_SIZE.width) / 2;
+      const offsetY = (viewport.clientHeight - DEFAULT_BOARD_SIZE.height) / 2;
+
+      setPan({
+        x: Math.max(32, offsetX),
+        y: Math.max(32, offsetY),
       });
     };
 
-    updateSize();
+    centerBoard();
 
-    const observer = new ResizeObserver(updateSize);
+    const observer = new ResizeObserver(centerBoard);
     observer.observe(viewport);
 
     return () => observer.disconnect();
@@ -119,12 +117,18 @@ export function BoardShell({
     });
   };
 
-  const updateLinkPosition = (linkId: string, x: number, y: number) => {
-    if (boardSize.width === 0 || boardSize.height === 0) {
-      return;
-    }
+  const previewLinkPosition = (linkId: string, x: number, y: number) => {
+    const clamped = clampBoardPosition(x, y);
 
-    const clamped = clampBoardPosition(x, y, boardSize);
+    setLinks((current) =>
+      current.map((link) =>
+        link.id === linkId ? { ...link, ...clamped } : link,
+      ),
+    );
+  };
+
+  const commitLinkPosition = (linkId: string, x: number, y: number) => {
+    const clamped = clampBoardPosition(x, y);
 
     setLinks((current) =>
       current.map((link) =>
@@ -140,22 +144,17 @@ export function BoardShell({
     );
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleBoardDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    event.stopPropagation();
 
-    if (
-      handToolActive ||
-      !event.dataTransfer.getData(PIZARRA_DRAG_TYPE) ||
-      !viewportRef.current ||
-      boardSize.width === 0 ||
-      boardSize.height === 0
-    ) {
+    if (handToolActive || !event.dataTransfer.getData(PIZARRA_DRAG_TYPE)) {
       return;
     }
 
     const { x, y } = screenToWorld(event.clientX, event.clientY);
 
-    if (!canPlaceBoardCard(x, y, boardSize)) {
+    if (!isPointInsideBoard(x, y) || !canPlaceBoardCard(x, y)) {
       return;
     }
 
@@ -182,7 +181,7 @@ export function BoardShell({
       });
   };
 
-  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+  const handleViewportWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (!handToolActive || !viewportRef.current) {
       return;
     }
@@ -204,7 +203,9 @@ export function BoardShell({
     });
   };
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleViewportPointerDown = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
     if (!handToolActive || event.button !== 0) {
       return;
     }
@@ -220,7 +221,9 @@ export function BoardShell({
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleViewportPointerMove = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
     const session = panSession.current;
 
     if (!session || session.pointerId !== event.pointerId) {
@@ -233,7 +236,9 @@ export function BoardShell({
     });
   };
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleViewportPointerUp = (
+    event: React.PointerEvent<HTMLDivElement>,
+  ) => {
     const session = panSession.current;
 
     if (!session || session.pointerId !== event.pointerId) {
@@ -245,7 +250,7 @@ export function BoardShell({
   };
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-[#ebebeb]">
+    <div className="flex h-dvh w-full overflow-hidden bg-[#e8e8e8]">
       <BoardSidebar
         backHref={backHref}
         handToolActive={handToolActive}
@@ -253,7 +258,7 @@ export function BoardShell({
       />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center border-b border-[#ececec] bg-white px-5">
+        <header className="relative z-10 flex h-12 shrink-0 items-center border-b border-[#ececec] bg-white px-5">
           <h1 className="text-[13px] font-medium text-[#404040]">
             {isHome ? "Home" : boardName}
           </h1>
@@ -261,46 +266,52 @@ export function BoardShell({
 
         <div
           ref={viewportRef}
-          className={`relative min-h-0 flex-1 overflow-hidden bg-[#ebebeb] ${
+          className={`relative min-h-0 flex-1 overflow-hidden bg-[#e8e8e8] ${
             handToolActive ? "cursor-grab active:cursor-grabbing" : ""
           }`}
-          onDragOver={(event) => {
-            if (handToolActive) {
-              return;
-            }
-
-            event.preventDefault();
-            event.dataTransfer.dropEffect = "copy";
-          }}
-          onDrop={handleDrop}
-          onWheel={handleWheel}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onWheel={handleViewportWheel}
+          onPointerDown={handleViewportPointerDown}
+          onPointerMove={handleViewportPointerMove}
+          onPointerUp={handleViewportPointerUp}
+          onPointerCancel={handleViewportPointerUp}
         >
-          {boardSize.width > 0 && boardSize.height > 0 ? (
+          <div
+            className="absolute top-0 left-0"
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "0 0",
+            }}
+          >
             <div
-              className="board-surface absolute top-0 left-0 border border-[#d4d4d4] bg-[#fafafa] shadow-sm"
+              className="board-surface relative border border-[#d4d4d4] bg-[#fafafa] shadow-sm"
               style={{
-                width: boardSize.width,
-                height: boardSize.height,
-                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                transformOrigin: "0 0",
+                width: DEFAULT_BOARD_SIZE.width,
+                height: DEFAULT_BOARD_SIZE.height,
               }}
+              onDragOver={(event) => {
+                if (handToolActive) {
+                  return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                event.dataTransfer.dropEffect = "copy";
+              }}
+              onDrop={handleBoardDrop}
             >
               {links.map((link) => (
                 <BoardLinkCard
                   key={link.id}
                   link={link}
-                  interactionEnabled={!handToolActive}
+                  selectMode={!handToolActive}
                   screenToWorld={screenToWorld}
-                  onMove={updateLinkPosition}
+                  onMovePreview={previewLinkPosition}
+                  onMoveCommit={commitLinkPosition}
                   onRename={renameBoard}
                 />
               ))}
             </div>
-          ) : null}
+          </div>
         </div>
       </div>
     </div>
