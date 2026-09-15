@@ -1,4 +1,4 @@
-import { BoardCanvas } from "@/app/components/board-canvas";
+import { BoardCanvas } from "@/components/board-canvas";
 
 export default function Home() {
   return (
