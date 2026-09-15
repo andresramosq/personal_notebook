@@ -55,6 +55,21 @@ export function BoardShell({
     panX: number;
     panY: number;
   } | null>(null);
+  const zoomRef = useRef(zoom);
+  const panRef = useRef(pan);
+  const handToolActiveRef = useRef(handToolActive);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+
+  useEffect(() => {
+    handToolActiveRef.current = handToolActive;
+  }, [handToolActive]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -63,22 +78,52 @@ export function BoardShell({
       return;
     }
 
-    const centerBoard = () => {
-      const offsetX = (viewport.clientWidth - DEFAULT_BOARD_SIZE.width) / 2;
-      const offsetY = (viewport.clientHeight - DEFAULT_BOARD_SIZE.height) / 2;
+    const offsetX = (viewport.clientWidth - DEFAULT_BOARD_SIZE.width) / 2;
+    const offsetY = (viewport.clientHeight - DEFAULT_BOARD_SIZE.height) / 2;
 
+    setPan({
+      x: Math.max(32, offsetX),
+      y: Math.max(32, offsetY),
+    });
+  }, []);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+
+    if (!viewport) {
+      return;
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      if (!handToolActiveRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const rect = viewport.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      const zoomFactor = event.deltaY > 0 ? 0.92 : 1.08;
+      const currentZoom = zoomRef.current;
+      const currentPan = panRef.current;
+      const nextZoom = Math.min(
+        Math.max(currentZoom * zoomFactor, MIN_ZOOM),
+        MAX_ZOOM,
+      );
+      const worldX = (mouseX - currentPan.x) / currentZoom;
+      const worldY = (mouseY - currentPan.y) / currentZoom;
+
+      setZoom(nextZoom);
       setPan({
-        x: Math.max(32, offsetX),
-        y: Math.max(32, offsetY),
+        x: mouseX - worldX * nextZoom,
+        y: mouseY - worldY * nextZoom,
       });
     };
 
-    centerBoard();
+    viewport.addEventListener("wheel", handleWheel, { passive: false });
 
-    const observer = new ResizeObserver(centerBoard);
-    observer.observe(viewport);
-
-    return () => observer.disconnect();
+    return () => viewport.removeEventListener("wheel", handleWheel);
   }, []);
 
   const screenToWorld = useCallback(
@@ -181,28 +226,6 @@ export function BoardShell({
       });
   };
 
-  const handleViewportWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    if (!handToolActive || !viewportRef.current) {
-      return;
-    }
-
-    event.preventDefault();
-
-    const rect = viewportRef.current.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-    const zoomFactor = event.deltaY > 0 ? 0.92 : 1.08;
-    const nextZoom = Math.min(Math.max(zoom * zoomFactor, MIN_ZOOM), MAX_ZOOM);
-    const worldX = (mouseX - pan.x) / zoom;
-    const worldY = (mouseY - pan.y) / zoom;
-
-    setZoom(nextZoom);
-    setPan({
-      x: mouseX - worldX * nextZoom,
-      y: mouseY - worldY * nextZoom,
-    });
-  };
-
   const handleViewportPointerDown = (
     event: React.PointerEvent<HTMLDivElement>,
   ) => {
@@ -258,7 +281,7 @@ export function BoardShell({
       />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="relative z-10 flex h-12 shrink-0 items-center border-b border-[#ececec] bg-white px-5">
+        <header className="relative z-20 flex h-12 shrink-0 items-center border-b border-[#ececec] bg-white px-5">
           <h1 className="text-[13px] font-medium text-[#404040]">
             {isHome ? "Home" : boardName}
           </h1>
@@ -266,10 +289,11 @@ export function BoardShell({
 
         <div
           ref={viewportRef}
-          className={`relative min-h-0 flex-1 overflow-hidden bg-[#e8e8e8] ${
-            handToolActive ? "cursor-grab active:cursor-grabbing" : ""
+          className={`relative z-0 min-h-0 flex-1 overflow-hidden bg-[#e8e8e8] ${
+            handToolActive
+              ? "cursor-grab touch-none active:cursor-grabbing"
+              : ""
           }`}
-          onWheel={handleViewportWheel}
           onPointerDown={handleViewportPointerDown}
           onPointerMove={handleViewportPointerMove}
           onPointerUp={handleViewportPointerUp}
