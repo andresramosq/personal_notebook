@@ -79,3 +79,33 @@ export async function updateBoardLinkPosition(
     data: { x, y },
   });
 }
+
+export async function getParentBoard(boardId: string) {
+  const link = await prisma.boardLink.findFirst({
+    where: { targetBoardId: boardId },
+    select: {
+      parentBoard: {
+        select: {
+          id: true,
+          slug: true,
+        },
+      },
+    },
+  });
+
+  return link?.parentBoard ?? null;
+}
+
+export function getBackHref(
+  parentBoard: { id: string; slug: string | null } | null,
+) {
+  if (!parentBoard) {
+    return null;
+  }
+
+  if (parentBoard.slug === "principal") {
+    return "/";
+  }
+
+  return `/pizarra/${parentBoard.id}`;
+}

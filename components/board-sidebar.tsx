@@ -40,10 +40,10 @@ function BackIcon({ className }: { className?: string }) {
 }
 
 type BoardSidebarProps = {
-  isHome: boolean;
+  backHref: string | null;
 };
 
-export function BoardSidebar({ isHome }: BoardSidebarProps) {
+export function BoardSidebar({ backHref }: BoardSidebarProps) {
   return (
     <aside className="flex w-[17.5rem] shrink-0 flex-col border-r border-[#e8e0d4] bg-[#faf8f4]">
       <div className="flex h-14 items-center gap-3 border-b border-[#e8e0d4] px-4">
@@ -56,7 +56,15 @@ export function BoardSidebar({ isHome }: BoardSidebarProps) {
       </div>
 
       <div className="border-b border-[#e8e0d4] p-2">
-        {isHome ? (
+        {backHref ? (
+          <Link
+            href={backHref}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#4a433b] transition-colors hover:bg-[#f0ebe3]"
+          >
+            <BackIcon className="size-4" />
+            Atrás
+          </Link>
+        ) : (
           <button
             type="button"
             disabled
@@ -66,14 +74,6 @@ export function BoardSidebar({ isHome }: BoardSidebarProps) {
             <BackIcon className="size-4" />
             Atrás
           </button>
-        ) : (
-          <Link
-            href="/"
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[#4a433b] transition-colors hover:bg-[#f0ebe3]"
-          >
-            <BackIcon className="size-4" />
-            Atrás
-          </Link>
         )}
       </div>
 

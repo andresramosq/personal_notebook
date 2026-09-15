@@ -14,14 +14,14 @@ export type BoardLinkItem = {
 type BoardShellProps = {
   boardId: string;
   boardName: string;
-  isHome: boolean;
+  backHref: string | null;
   initialLinks: BoardLinkItem[];
 };
 
 export function BoardShell({
   boardId,
   boardName,
-  isHome,
+  backHref,
   initialLinks,
 }: BoardShellProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -68,7 +68,7 @@ export function BoardShell({
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-[#f5f2eb]">
-      <BoardSidebar isHome={isHome} />
+      <BoardSidebar backHref={backHref} />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
         <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-8">

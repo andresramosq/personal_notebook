@@ -9,7 +9,7 @@ export default async function Home() {
     <BoardShell
       boardId={board.id}
       boardName={board.name}
-      isHome
+      backHref={null}
       initialLinks={boardWithLinks?.links ?? []}
     />
   );
