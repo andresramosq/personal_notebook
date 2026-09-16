@@ -65,7 +65,7 @@ function BoardName({
             setEditing(false);
           }
         }}
-        className="w-full rounded border border-[#d4d4d4] bg-white px-1.5 py-0.5 text-[11px] text-[#404040] outline-none focus:border-[#a3a3a3]"
+        className="min-w-0 flex-1 rounded border border-[#d4d4d4] bg-white px-1 py-0.5 text-[11px] text-[#404040] outline-none focus:border-[#a3a3a3]"
       />
     );
   }
@@ -74,7 +74,7 @@ function BoardName({
     <button
       type="button"
       onClick={startEditing}
-      className="min-w-0 flex-1 truncate text-left text-[11px] text-[#404040] hover:text-[#171717]"
+      className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-left text-[11px] text-[#404040] hover:text-[#171717]"
     >
       {value}
     </button>
@@ -116,7 +116,7 @@ export default function Home() {
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-[#e8e8e8]">
       {sidebarOpen ? (
-        <aside className="relative flex w-52 shrink-0 flex-col border-r border-[#d4d4d4] bg-white">
+        <aside className="relative flex w-[4.75rem] shrink-0 flex-col border-r border-[#d4d4d4] bg-white">
           <button
             type="button"
             aria-label="Cerrar panel"
@@ -126,9 +126,9 @@ export default function Home() {
             <PanelCloseIcon />
           </button>
 
-          <div className="flex flex-col gap-4 px-2 pb-3 pt-14">
+          <div className="flex flex-col gap-3 px-1 pb-3 pt-14">
             <section>
-              <h2 className="mb-2 px-1 text-[10px] font-medium uppercase tracking-wide text-[#a3a3a3]">
+              <h2 className="mb-1.5 truncate text-center text-[9px] font-medium uppercase tracking-wide text-[#a3a3a3]">
                 Opciones
               </h2>
               <button
@@ -143,15 +143,15 @@ export default function Home() {
               </button>
             </section>
 
-            <section className="border-t border-[#ececec] pt-4">
-              <h2 className="mb-2 px-1 text-[10px] font-medium uppercase tracking-wide text-[#a3a3a3]">
+            <section className="border-t border-[#ececec] pt-3">
+              <h2 className="mb-1.5 truncate text-center text-[9px] font-medium uppercase tracking-wide text-[#a3a3a3]">
                 Elementos
               </h2>
               <div className="flex flex-col gap-0.5">
                 {boards.map((board) => (
                   <div
                     key={board.id}
-                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[#f5f5f5]"
+                    className="flex min-w-0 items-center gap-1 rounded-md px-1 py-1.5 hover:bg-[#f5f5f5]"
                   >
                     <Layout
                       className="size-3.5 shrink-0 text-[#737373]"
