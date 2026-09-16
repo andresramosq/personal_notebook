@@ -3,7 +3,16 @@ import { prisma } from "@/lib/prisma";
 export type BoardRecord = {
   id: string;
   name: string;
+  parentId: string | null;
+  x: number;
+  y: number;
   createdAt: Date;
+};
+
+type CreateBoardOptions = {
+  parentId?: string | null;
+  x?: number;
+  y?: number;
 };
 
 export async function listBoards(): Promise<BoardRecord[]> {
@@ -12,12 +21,27 @@ export async function listBoards(): Promise<BoardRecord[]> {
   });
 }
 
-export async function createBoard(): Promise<BoardRecord> {
-  const count = await prisma.board.count();
+export async function listChildBoards(parentId: string): Promise<BoardRecord[]> {
+  return prisma.board.findMany({
+    where: { parentId },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function createBoard(
+  options: CreateBoardOptions = {},
+): Promise<BoardRecord> {
+  const parentId = options.parentId ?? null;
+  const count = await prisma.board.count({
+    where: { parentId },
+  });
 
   return prisma.board.create({
     data: {
       name: `Pizarra ${count + 1}`,
+      parentId,
+      x: options.x ?? 120 + count * 40,
+      y: options.y ?? 120 + count * 40,
     },
   });
 }

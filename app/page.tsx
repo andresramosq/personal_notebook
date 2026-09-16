@@ -6,8 +6,12 @@ import {
   createBoardAction,
   deleteBoardAction,
   listBoardsAction,
+  listChildBoardsAction,
   updateBoardNameAction,
 } from "@/app/actions/boards";
+import { BoardCanvasCard } from "@/components/board/board-canvas-card";
+import { BoardContextMenu } from "@/components/board/board-context-menu";
+import { BoardSidebarItem } from "@/components/board/board-sidebar-item";
 import { PanelCloseIcon } from "@/components/icons/panel-close-icon";
 import { PanelOpenIcon } from "@/components/icons/panel-open-icon";
 import { BoardCanvas } from "@/components/board-canvas";
@@ -15,66 +19,6 @@ import type { BoardRecord } from "@/lib/boards";
 
 const ICON_BUTTON_CLASS =
   "flex h-12 w-12 cursor-pointer items-center justify-center rounded-md text-[#525252] transition-colors hover:bg-[#f5f5f5]";
-
-const CONTEXT_MENU_ITEM_CLASS =
-  "block w-full cursor-pointer px-3 py-1.5 text-left text-[13px] text-[#404040] hover:bg-[#f5f5f5]";
-
-function BoardName({
-  value,
-  onSave,
-  isEditing,
-  onRequestEdit,
-  onFinishEditing,
-}: {
-  value: string;
-  onSave: (name: string) => void;
-  isEditing: boolean;
-  onRequestEdit: () => void;
-  onFinishEditing: () => void;
-}) {
-  if (isEditing) {
-    return (
-      <input
-        autoFocus
-        defaultValue={value}
-        onClick={(event) => event.stopPropagation()}
-        onBlur={(event) => {
-          const trimmed = event.target.value.trim();
-
-          if (trimmed && trimmed !== value) {
-            onSave(trimmed);
-          }
-
-          onFinishEditing();
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            event.currentTarget.blur();
-          }
-
-          if (event.key === "Escape") {
-            onFinishEditing();
-          }
-        }}
-        className="min-w-0 flex-1 rounded border border-[#d4d4d4] bg-white px-1 py-0.5 text-[11px] text-[#404040] outline-none focus:border-[#a3a3a3]"
-      />
-    );
-  }
-
-  return (
-    <span
-      title={value}
-      onDoubleClick={(event) => {
-        event.stopPropagation();
-        onRequestEdit();
-      }}
-      className="min-w-0 flex-1 truncate text-left text-[11px] text-[#404040]"
-    >
-      {value}
-    </span>
-  );
-}
 
 type BoardListItem = BoardRecord & {
   pending?: boolean;
@@ -86,16 +30,51 @@ type ContextMenuState = {
   boardId: string;
 };
 
+function openContextMenu(
+  event: React.MouseEvent,
+  boardId: string,
+  pending?: boolean,
+) {
+  if (pending) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  return {
+    x: event.clientX,
+    y: event.clientY,
+    boardId,
+  };
+}
+
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [boards, setBoards] = useState<BoardListItem[]>([]);
+  const [childBoards, setChildBoards] = useState<BoardListItem[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   useEffect(() => {
-    void listBoardsAction().then(setBoards);
+    void listBoardsAction().then((items) => {
+      setBoards(items.filter((board) => board.parentId === null));
+    });
   }, []);
+
+  useEffect(() => {
+    if (!activeBoardId) {
+      return;
+    }
+
+    void listChildBoardsAction(activeBoardId).then(setChildBoards);
+  }, [activeBoardId]);
+
+  const openBoard = (boardId: string) => {
+    setChildBoards([]);
+    setActiveBoardId(boardId);
+  };
 
   useEffect(() => {
     if (!contextMenu) {
@@ -114,16 +93,48 @@ export default function Home() {
   }, [contextMenu]);
 
   const handleCreateBoard = () => {
+    if (activeBoardId) {
+      const tempId = crypto.randomUUID();
+      const tempBoard: BoardListItem = {
+        id: tempId,
+        name: `Pizarra ${childBoards.length + 1}`,
+        parentId: activeBoardId,
+        x: 120 + childBoards.length * 40,
+        y: 120 + childBoards.length * 40,
+        createdAt: new Date(),
+        pending: true,
+      };
+
+      setChildBoards((current) => [...current, tempBoard]);
+
+      void createBoardAction(activeBoardId)
+        .then((board) => {
+          setChildBoards((current) =>
+            current.map((item) => (item.id === tempId ? board : item)),
+          );
+        })
+        .catch(() => {
+          setChildBoards((current) =>
+            current.filter((item) => item.id !== tempId),
+          );
+        });
+
+      return;
+    }
+
     const tempId = crypto.randomUUID();
     const tempBoard: BoardListItem = {
       id: tempId,
       name: `Pizarra ${boards.length + 1}`,
+      parentId: null,
+      x: 120,
+      y: 120,
       createdAt: new Date(),
       pending: true,
     };
 
     setBoards((current) => [...current, tempBoard]);
-    setActiveBoardId(tempId);
+    openBoard(tempId);
 
     void createBoardAction()
       .then((board) => {
@@ -139,24 +150,34 @@ export default function Home() {
   };
 
   const handleRenameBoard = (id: string, name: string) => {
-    const previousBoards = boards;
-    const board = boards.find((item) => item.id === id);
+    const board =
+      boards.find((item) => item.id === id) ??
+      childBoards.find((item) => item.id === id);
 
     if (board?.pending) {
       return;
     }
 
+    const previousBoards = boards;
+    const previousChildBoards = childBoards;
+
     setBoards((current) =>
+      current.map((item) => (item.id === id ? { ...item, name } : item)),
+    );
+    setChildBoards((current) =>
       current.map((item) => (item.id === id ? { ...item, name } : item)),
     );
 
     void updateBoardNameAction(id, name).catch(() => {
       setBoards(previousBoards);
+      setChildBoards(previousChildBoards);
     });
   };
 
   const handleDeleteBoard = (id: string) => {
-    const board = boards.find((item) => item.id === id);
+    const board =
+      boards.find((item) => item.id === id) ??
+      childBoards.find((item) => item.id === id);
 
     if (!board || board.pending) {
       return;
@@ -169,12 +190,14 @@ export default function Home() {
     }
 
     const previousBoards = boards;
+    const previousChildBoards = childBoards;
     const previousActiveBoardId = activeBoardId;
 
     setBoards((current) => current.filter((item) => item.id !== id));
+    setChildBoards((current) => current.filter((item) => item.id !== id));
 
     if (activeBoardId === id) {
-      setActiveBoardId(null);
+      setActiveBoardId(board.parentId);
     }
 
     if (editingBoardId === id) {
@@ -183,6 +206,7 @@ export default function Home() {
 
     void deleteBoardAction(id).catch(() => {
       setBoards(previousBoards);
+      setChildBoards(previousChildBoards);
       setActiveBoardId(previousActiveBoardId);
     });
   };
@@ -222,39 +246,27 @@ export default function Home() {
               </h2>
               <div className="flex flex-col gap-0.5">
                 {boards.map((board) => (
-                  <button
+                  <BoardSidebarItem
                     key={board.id}
-                    type="button"
-                    onClick={() => setActiveBoardId(board.id)}
+                    name={board.name}
+                    isActive={activeBoardId === board.id}
+                    isEditing={editingBoardId === board.id}
+                    onOpen={() => openBoard(board.id)}
                     onContextMenu={(event) => {
-                      if (board.pending) {
-                        return;
-                      }
+                      const menu = openContextMenu(
+                        event,
+                        board.id,
+                        board.pending,
+                      );
 
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setContextMenu({
-                        x: event.clientX,
-                        y: event.clientY,
-                        boardId: board.id,
-                      });
+                      if (menu) {
+                        setContextMenu(menu);
+                      }
                     }}
-                    className={`flex min-w-0 cursor-pointer items-center gap-1 rounded-md px-1 py-1.5 text-left hover:bg-[#f5f5f5] ${
-                      activeBoardId === board.id ? "bg-[#f5f5f5]" : ""
-                    }`}
-                  >
-                    <Layout
-                      className="size-3.5 shrink-0 text-[#737373]"
-                      strokeWidth={1.5}
-                    />
-                    <BoardName
-                      value={board.name}
-                      isEditing={editingBoardId === board.id}
-                      onRequestEdit={() => setEditingBoardId(board.id)}
-                      onFinishEditing={() => setEditingBoardId(null)}
-                      onSave={(name) => handleRenameBoard(board.id, name)}
-                    />
-                  </button>
+                    onRequestEdit={() => setEditingBoardId(board.id)}
+                    onFinishEditing={() => setEditingBoardId(null)}
+                    onSave={(name) => handleRenameBoard(board.id, name)}
+                  />
                 ))}
               </div>
             </section>
@@ -278,38 +290,49 @@ export default function Home() {
 
         {activeBoardId ? (
           <div className="min-h-0 flex-1">
-            <BoardCanvas />
+            <BoardCanvas>
+              {childBoards.map((board) => (
+                <BoardCanvasCard
+                  key={board.id}
+                  name={board.name}
+                  x={board.x}
+                  y={board.y}
+                  isEditing={editingBoardId === board.id}
+                  onOpen={() => openBoard(board.id)}
+                  onContextMenu={(event) => {
+                    const menu = openContextMenu(
+                      event,
+                      board.id,
+                      board.pending,
+                    );
+
+                    if (menu) {
+                      setContextMenu(menu);
+                    }
+                  }}
+                  onRequestEdit={() => setEditingBoardId(board.id)}
+                  onFinishEditing={() => setEditingBoardId(null)}
+                  onSave={(name) => handleRenameBoard(board.id, name)}
+                />
+              ))}
+            </BoardCanvas>
           </div>
         ) : null}
       </div>
 
       {contextMenu ? (
-        <div
-          className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border border-[#d4d4d4] bg-white py-1 shadow-lg"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            className={CONTEXT_MENU_ITEM_CLASS}
-            onClick={() => {
-              setEditingBoardId(contextMenu.boardId);
-              setContextMenu(null);
-            }}
-          >
-            Editar nombre
-          </button>
-          <button
-            type="button"
-            className={`${CONTEXT_MENU_ITEM_CLASS} text-[#dc2626] hover:bg-[#fef2f2]`}
-            onClick={() => {
-              handleDeleteBoard(contextMenu.boardId);
-              setContextMenu(null);
-            }}
-          >
-            Eliminar
-          </button>
-        </div>
+        <BoardContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onEdit={() => {
+            setEditingBoardId(contextMenu.boardId);
+            setContextMenu(null);
+          }}
+          onDelete={() => {
+            handleDeleteBoard(contextMenu.boardId);
+            setContextMenu(null);
+          }}
+        />
       ) : null}
     </main>
   );

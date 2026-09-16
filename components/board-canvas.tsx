@@ -11,9 +11,10 @@ const MAX_ZOOM = 2.5;
 
 type BoardCanvasProps = {
   className?: string;
+  children?: React.ReactNode;
 };
 
-export function BoardCanvas({ className = "" }: BoardCanvasProps) {
+export function BoardCanvas({ className = "", children }: BoardCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -84,7 +85,9 @@ export function BoardCanvas({ className = "" }: BoardCanvasProps) {
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: "0 0",
         }}
-      />
+      >
+        {children}
+      </div>
     </div>
   );
 }
