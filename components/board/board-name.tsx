@@ -24,8 +24,10 @@ export function BoardName({
   if (isEditing) {
     return (
       <input
+        data-board-name=""
         autoFocus
         defaultValue={value}
+        onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
         onBlur={(event) => {
           const trimmed = event.target.value.trim();
@@ -53,7 +55,9 @@ export function BoardName({
 
   return (
     <span
+      data-board-name=""
       title={value}
+      onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
 
