@@ -73,8 +73,9 @@ function BoardName({
   return (
     <button
       type="button"
+      title={value}
       onClick={startEditing}
-      className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-left text-[11px] text-[#404040] hover:text-[#171717]"
+      className="min-w-0 flex-1 truncate text-left text-[11px] text-[#404040] hover:text-[#171717]"
     >
       {value}
     </button>
