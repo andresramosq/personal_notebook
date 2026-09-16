@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/boards";
 import { PanelCloseIcon } from "@/components/icons/panel-close-icon";
 import { PanelOpenIcon } from "@/components/icons/panel-open-icon";
+import { BoardCanvas } from "@/components/board-canvas";
 import type { BoardRecord } from "@/lib/boards";
 
 const ICON_BUTTON_CLASS =
@@ -85,6 +86,7 @@ function BoardName({
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [boards, setBoards] = useState<BoardRecord[]>([]);
+  const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -95,6 +97,7 @@ export default function Home() {
     startTransition(async () => {
       const board = await createBoardAction();
       setBoards((current) => [...current, board]);
+      setActiveBoardId(board.id);
     });
   };
 
@@ -183,6 +186,12 @@ export default function Home() {
             </button>
           ) : null}
         </header>
+
+        {activeBoardId ? (
+          <div className="min-h-0 flex-1">
+            <BoardCanvas />
+          </div>
+        ) : null}
       </div>
     </main>
   );
