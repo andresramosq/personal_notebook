@@ -58,6 +58,7 @@ function previewAt(clientX: number, clientY: number, canvas: BoardCanvasHandle) 
 
 export default function Home() {
   const canvasRef = useRef<BoardCanvasHandle>(null);
+  const suppressCreateClickRef = useRef(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [boards, setBoards] = useState<BoardListItem[]>([]);
   const [childBoards, setChildBoards] = useState<BoardListItem[]>([]);
@@ -118,6 +119,11 @@ export default function Home() {
   };
 
   const handleCreateRootBoard = () => {
+    if (suppressCreateClickRef.current) {
+      suppressCreateClickRef.current = false;
+      return;
+    }
+
     const tempId = crypto.randomUUID();
     const tempBoard: BoardListItem = {
       id: tempId,
@@ -190,8 +196,6 @@ export default function Home() {
       return;
     }
 
-    event.preventDefault();
-
     const startX = event.clientX;
     const startY = event.clientY;
     let moved = false;
@@ -236,6 +240,7 @@ export default function Home() {
       }
 
       const position = previewAt(upEvent.clientX, upEvent.clientY, canvas);
+      suppressCreateClickRef.current = true;
       handleCreateChildBoard(position.x, position.y);
     };
 
@@ -343,9 +348,10 @@ export default function Home() {
                 Opciones
               </h2>
               <BoardPaletteButton
-                canPlaceOnCanvas={Boolean(activeBoardId)}
-                onCreateRoot={handleCreateRootBoard}
-                onStartPlacement={handleStartPlacement}
+                onCreate={handleCreateRootBoard}
+                onStartPlacement={
+                  activeBoardId ? handleStartPlacement : undefined
+                }
               />
             </section>
 
