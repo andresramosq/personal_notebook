@@ -1,6 +1,6 @@
 "use server";
 
-import { createBoard, listBoards, updateBoardName } from "@/lib/boards";
+import { createBoard, deleteBoard, listBoards, updateBoardName } from "@/lib/boards";
 
 export async function listBoardsAction() {
   return listBoards();
@@ -12,4 +12,8 @@ export async function createBoardAction() {
 
 export async function updateBoardNameAction(id: string, name: string) {
   return updateBoardName(id, name);
+}
+
+export async function deleteBoardAction(id: string) {
+  return deleteBoard(id);
 }

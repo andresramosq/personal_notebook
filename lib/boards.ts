@@ -37,3 +37,9 @@ export async function updateBoardName(
     data: { name: trimmed },
   });
 }
+
+export async function deleteBoard(id: string) {
+  return prisma.board.delete({
+    where: { id },
+  });
+}
