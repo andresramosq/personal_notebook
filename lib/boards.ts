@@ -9,6 +9,15 @@ export type BoardRecord = {
   createdAt: Date;
 };
 
+const boardSelect = {
+  id: true,
+  name: true,
+  parentId: true,
+  x: true,
+  y: true,
+  createdAt: true,
+} as const;
+
 type CreateBoardOptions = {
   parentId?: string | null;
   x?: number;
@@ -17,7 +26,9 @@ type CreateBoardOptions = {
 
 export async function listBoards(): Promise<BoardRecord[]> {
   return prisma.board.findMany({
+    where: { parentId: null },
     orderBy: { createdAt: "asc" },
+    select: boardSelect,
   });
 }
 
@@ -25,6 +36,7 @@ export async function listChildBoards(parentId: string): Promise<BoardRecord[]> 
   return prisma.board.findMany({
     where: { parentId },
     orderBy: { createdAt: "asc" },
+    select: boardSelect,
   });
 }
 
@@ -40,9 +52,10 @@ export async function createBoard(
     data: {
       name: `Pizarra ${count + 1}`,
       parentId,
-      x: options.x ?? 120 + count * 40,
-      y: options.y ?? 120 + count * 40,
+      x: options.x !== undefined ? options.x : 120 + count * 40,
+      y: options.y !== undefined ? options.y : 120 + count * 40,
     },
+    select: boardSelect,
   });
 }
 
@@ -59,6 +72,19 @@ export async function updateBoardName(
   return prisma.board.update({
     where: { id },
     data: { name: trimmed },
+    select: boardSelect,
+  });
+}
+
+export async function updateBoardPosition(
+  id: string,
+  x: number,
+  y: number,
+): Promise<BoardRecord> {
+  return prisma.board.update({
+    where: { id },
+    data: { x, y },
+    select: boardSelect,
   });
 }
 
