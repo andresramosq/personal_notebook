@@ -65,7 +65,7 @@ function BoardName({
             setEditing(false);
           }
         }}
-        className="w-full rounded border border-[#d4d4d4] bg-white px-1 py-0.5 text-center text-[10px] text-[#404040] outline-none focus:border-[#a3a3a3]"
+        className="w-full rounded border border-[#d4d4d4] bg-white px-1.5 py-0.5 text-[11px] text-[#404040] outline-none focus:border-[#a3a3a3]"
       />
     );
   }
@@ -74,7 +74,7 @@ function BoardName({
     <button
       type="button"
       onClick={startEditing}
-      className="w-full truncate text-center text-[11px] leading-none text-[#737373] hover:text-[#171717]"
+      className="min-w-0 flex-1 truncate text-left text-[11px] text-[#404040] hover:text-[#171717]"
     >
       {value}
     </button>
@@ -116,7 +116,7 @@ export default function Home() {
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-[#e8e8e8]">
       {sidebarOpen ? (
-        <aside className="relative flex w-[4.75rem] shrink-0 flex-col border-r border-[#d4d4d4] bg-white">
+        <aside className="relative flex w-52 shrink-0 flex-col border-r border-[#d4d4d4] bg-white">
           <button
             type="button"
             aria-label="Cerrar panel"
@@ -126,8 +126,11 @@ export default function Home() {
             <PanelCloseIcon />
           </button>
 
-          <div className="flex flex-col pt-14">
-            <div className="border-b border-[#ececec] px-1 pb-3">
+          <div className="flex flex-col gap-4 px-2 pb-3 pt-14">
+            <section>
+              <h2 className="mb-2 px-1 text-[10px] font-medium uppercase tracking-wide text-[#a3a3a3]">
+                Opciones
+              </h2>
               <button
                 type="button"
                 aria-label="Crear pizarra"
@@ -138,25 +141,30 @@ export default function Home() {
                 <Layout className="size-5" strokeWidth={1.5} />
                 <span className="text-[11px] leading-none">Pizarra</span>
               </button>
-            </div>
+            </section>
 
-            <div className="flex flex-col gap-1 px-1 py-3">
-              {boards.map((board) => (
-                <div
-                  key={board.id}
-                  className="flex flex-col items-center gap-1.5 rounded-lg px-1 py-2 hover:bg-[#f5f5f5]"
-                >
-                  <Layout
-                    className="size-5 shrink-0 text-[#737373]"
-                    strokeWidth={1.5}
-                  />
-                  <BoardName
-                    value={board.name}
-                    onSave={(name) => handleRenameBoard(board.id, name)}
-                  />
-                </div>
-              ))}
-            </div>
+            <section className="border-t border-[#ececec] pt-4">
+              <h2 className="mb-2 px-1 text-[10px] font-medium uppercase tracking-wide text-[#a3a3a3]">
+                Elementos
+              </h2>
+              <div className="flex flex-col gap-0.5">
+                {boards.map((board) => (
+                  <div
+                    key={board.id}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[#f5f5f5]"
+                  >
+                    <Layout
+                      className="size-3.5 shrink-0 text-[#737373]"
+                      strokeWidth={1.5}
+                    />
+                    <BoardName
+                      value={board.name}
+                      onSave={(name) => handleRenameBoard(board.id, name)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         </aside>
       ) : null}
