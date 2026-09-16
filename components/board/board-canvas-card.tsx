@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { BoardName } from "@/components/board/board-name";
 import { useBoardCanvas } from "@/components/board/board-canvas-context";
 
@@ -30,7 +30,7 @@ type DragState = {
   openOnRelease: boolean;
 };
 
-export function BoardCanvasCard({
+export const BoardCanvasCard = memo(function BoardCanvasCard({
   name,
   x,
   y,
@@ -197,7 +197,7 @@ export function BoardCanvasCard({
       />
     </div>
   );
-}
+});
 
 export function BoardCanvasCardPreview({
   x,
