@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 
-const TOGGLE_BUTTON_CLASS =
-  "flex h-12 w-[4.75rem] shrink-0 items-center justify-end px-3 text-[#525252] hover:bg-[#f5f5f5]";
-
 function ChevronLeftIcon() {
   return (
     <svg
@@ -41,12 +38,12 @@ export default function Home() {
   return (
     <main className="flex h-dvh w-full overflow-hidden bg-[#e8e8e8]">
       {sidebarOpen ? (
-        <aside className="w-[4.75rem] shrink-0 border-r border-[#d4d4d4] bg-white">
+        <aside className="relative w-[4.75rem] shrink-0 border-r border-[#d4d4d4] bg-white">
           <button
             type="button"
             aria-label="Cerrar panel"
             onClick={() => setSidebarOpen(false)}
-            className={`${TOGGLE_BUTTON_CLASS} border-b border-[#d4d4d4]`}
+            className="absolute top-0 right-0 flex h-12 w-12 items-center justify-center text-[#525252] hover:bg-[#f5f5f5]"
           >
             <ChevronLeftIcon />
           </button>
@@ -56,14 +53,16 @@ export default function Home() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-12 shrink-0 border-b border-[#d4d4d4] bg-white shadow-sm">
           {!sidebarOpen ? (
-            <button
-              type="button"
-              aria-label="Abrir panel"
-              onClick={() => setSidebarOpen(true)}
-              className={`${TOGGLE_BUTTON_CLASS} border-r border-[#d4d4d4]`}
-            >
-              <ChevronRightIcon />
-            </button>
+            <div className="flex h-12 w-[4.75rem] shrink-0 justify-end">
+              <button
+                type="button"
+                aria-label="Abrir panel"
+                onClick={() => setSidebarOpen(true)}
+                className="flex h-12 w-12 items-center justify-center text-[#525252] hover:bg-[#f5f5f5]"
+              >
+                <ChevronRightIcon />
+              </button>
+            </div>
           ) : null}
         </header>
       </div>
