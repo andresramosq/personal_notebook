@@ -1,43 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { PanelCloseIcon } from "@/components/icons/panel-close-icon";
+import { PanelOpenIcon } from "@/components/icons/panel-open-icon";
 
 const ICON_BUTTON_CLASS =
   "flex h-12 w-12 cursor-pointer items-center justify-center rounded-md text-[#525252] transition-colors hover:bg-[#f5f5f5]";
-
-function PanelCloseIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className="size-5"
-      aria-hidden
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M9 3v18" strokeLinecap="round" />
-      <path d="m14 15-3-3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function PanelOpenIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className="size-5"
-      aria-hidden
-    >
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M9 3v18" strokeLinecap="round" />
-      <path d="m10 9 3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
