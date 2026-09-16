@@ -1,24 +1,35 @@
 "use client";
 
-import { Layout } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createBoardAction,
+  createRootBoardAction,
   deleteBoardAction,
   listBoardsAction,
   listChildBoardsAction,
   updateBoardNameAction,
+  updateBoardPositionAction,
 } from "@/app/actions/boards";
-import { BoardCanvasCard } from "@/components/board/board-canvas-card";
+import {
+  BOARD_CARD_HEIGHT,
+  BOARD_CARD_WIDTH,
+  BoardCanvasCard,
+} from "@/components/board/board-canvas-card";
 import { BoardContextMenu } from "@/components/board/board-context-menu";
+import { BoardPaletteButton } from "@/components/board/board-palette-button";
 import { BoardSidebarItem } from "@/components/board/board-sidebar-item";
 import { PanelCloseIcon } from "@/components/icons/panel-close-icon";
 import { PanelOpenIcon } from "@/components/icons/panel-open-icon";
-import { BoardCanvas } from "@/components/board-canvas";
+import {
+  BoardCanvas,
+  type BoardCanvasHandle,
+} from "@/components/board-canvas";
 import type { BoardRecord } from "@/lib/boards";
 
 const ICON_BUTTON_CLASS =
   "flex h-12 w-12 cursor-pointer items-center justify-center rounded-md text-[#525252] transition-colors hover:bg-[#f5f5f5]";
+
+const PLACEMENT_MOVE_THRESHOLD = 6;
 
 type BoardListItem = BoardRecord & {
   pending?: boolean;
@@ -30,37 +41,34 @@ type ContextMenuState = {
   boardId: string;
 };
 
-function openContextMenu(
-  event: React.MouseEvent,
-  boardId: string,
-  pending?: boolean,
-) {
-  if (pending) {
-    return;
-  }
+type PlacementPreview = {
+  x: number;
+  y: number;
+  name: string;
+};
 
-  event.preventDefault();
-  event.stopPropagation();
+function previewAt(clientX: number, clientY: number, canvas: BoardCanvasHandle) {
+  const { x, y } = canvas.screenToWorld(clientX, clientY);
 
   return {
-    x: event.clientX,
-    y: event.clientY,
-    boardId,
+    x: x - BOARD_CARD_WIDTH / 2,
+    y: y - BOARD_CARD_HEIGHT / 2,
   };
 }
 
 export default function Home() {
+  const canvasRef = useRef<BoardCanvasHandle>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [boards, setBoards] = useState<BoardListItem[]>([]);
   const [childBoards, setChildBoards] = useState<BoardListItem[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [placementPreview, setPlacementPreview] =
+    useState<PlacementPreview | null>(null);
 
   useEffect(() => {
-    void listBoardsAction().then((items) => {
-      setBoards(items.filter((board) => board.parentId === null));
-    });
+    void listBoardsAction().then(setBoards);
   }, []);
 
   useEffect(() => {
@@ -70,11 +78,6 @@ export default function Home() {
 
     void listChildBoardsAction(activeBoardId).then(setChildBoards);
   }, [activeBoardId]);
-
-  const openBoard = (boardId: string) => {
-    setChildBoards([]);
-    setActiveBoardId(boardId);
-  };
 
   useEffect(() => {
     if (!contextMenu) {
@@ -92,36 +95,29 @@ export default function Home() {
     };
   }, [contextMenu]);
 
-  const handleCreateBoard = () => {
-    if (activeBoardId) {
-      const tempId = crypto.randomUUID();
-      const tempBoard: BoardListItem = {
-        id: tempId,
-        name: `Pizarra ${childBoards.length + 1}`,
-        parentId: activeBoardId,
-        x: 120 + childBoards.length * 40,
-        y: 120 + childBoards.length * 40,
-        createdAt: new Date(),
-        pending: true,
-      };
+  const openBoard = (boardId: string) => {
+    setActiveBoardId(boardId);
+  };
 
-      setChildBoards((current) => [...current, tempBoard]);
-
-      void createBoardAction(activeBoardId)
-        .then((board) => {
-          setChildBoards((current) =>
-            current.map((item) => (item.id === tempId ? board : item)),
-          );
-        })
-        .catch(() => {
-          setChildBoards((current) =>
-            current.filter((item) => item.id !== tempId),
-          );
-        });
-
+  const openContextMenu = (
+    event: React.MouseEvent,
+    boardId: string,
+    pending?: boolean,
+  ) => {
+    if (pending) {
       return;
     }
 
+    event.preventDefault();
+    event.stopPropagation();
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      boardId,
+    });
+  };
+
+  const handleCreateRootBoard = () => {
     const tempId = crypto.randomUUID();
     const tempBoard: BoardListItem = {
       id: tempId,
@@ -134,9 +130,9 @@ export default function Home() {
     };
 
     setBoards((current) => [...current, tempBoard]);
-    openBoard(tempId);
+    setActiveBoardId(tempId);
 
-    void createBoardAction()
+    void createRootBoardAction()
       .then((board) => {
         setBoards((current) =>
           current.map((item) => (item.id === tempId ? board : item)),
@@ -147,6 +143,105 @@ export default function Home() {
         setBoards((current) => current.filter((item) => item.id !== tempId));
         setActiveBoardId((current) => (current === tempId ? null : current));
       });
+  };
+
+  const handleCreateChildBoard = (x: number, y: number) => {
+    if (!activeBoardId) {
+      return;
+    }
+
+    const nextName = `Pizarra ${childBoards.length + 1}`;
+    const tempId = crypto.randomUUID();
+    const tempBoard: BoardListItem = {
+      id: tempId,
+      name: nextName,
+      parentId: activeBoardId,
+      x,
+      y,
+      createdAt: new Date(),
+      pending: true,
+    };
+
+    setChildBoards((current) => [...current, tempBoard]);
+
+    void createBoardAction({ parentId: activeBoardId, x, y })
+      .then((board) => {
+        setChildBoards((current) =>
+          current.map((item) => (item.id === tempId ? board : item)),
+        );
+      })
+      .catch(() => {
+        setChildBoards((current) =>
+          current.filter((item) => item.id !== tempId),
+        );
+      });
+  };
+
+  const handleStartPlacement = (
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    if (!activeBoardId) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let moved = false;
+    const previewName = `Pizarra ${childBoards.length + 1}`;
+
+    const updatePreview = (clientX: number, clientY: number) => {
+      const position = previewAt(clientX, clientY, canvas);
+
+      setPlacementPreview({
+        ...position,
+        name: previewName,
+      });
+    };
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      if (
+        !moved &&
+        (Math.abs(moveEvent.clientX - startX) > PLACEMENT_MOVE_THRESHOLD ||
+          Math.abs(moveEvent.clientY - startY) > PLACEMENT_MOVE_THRESHOLD)
+      ) {
+        moved = true;
+      }
+
+      if (!moved) {
+        return;
+      }
+
+      updatePreview(moveEvent.clientX, moveEvent.clientY);
+    };
+
+    const finish = (upEvent: PointerEvent) => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      setPlacementPreview(null);
+
+      if (
+        !moved ||
+        !canvas.isOverCanvas(upEvent.clientX, upEvent.clientY)
+      ) {
+        return;
+      }
+
+      const position = previewAt(upEvent.clientX, upEvent.clientY, canvas);
+      handleCreateChildBoard(position.x, position.y);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
   };
 
   const handleRenameBoard = (id: string, name: string) => {
@@ -170,6 +265,24 @@ export default function Home() {
 
     void updateBoardNameAction(id, name).catch(() => {
       setBoards(previousBoards);
+      setChildBoards(previousChildBoards);
+    });
+  };
+
+  const handleMoveBoard = (id: string, x: number, y: number) => {
+    const board = childBoards.find((item) => item.id === id);
+
+    if (!board || board.pending) {
+      return;
+    }
+
+    const previousChildBoards = childBoards;
+
+    setChildBoards((current) =>
+      current.map((item) => (item.id === id ? { ...item, x, y } : item)),
+    );
+
+    void updateBoardPositionAction(id, x, y).catch(() => {
       setChildBoards(previousChildBoards);
     });
   };
@@ -229,15 +342,11 @@ export default function Home() {
               <h2 className="mb-1.5 truncate text-center text-[9px] font-medium uppercase tracking-wide text-[#a3a3a3]">
                 Opciones
               </h2>
-              <button
-                type="button"
-                aria-label="Crear pizarra"
-                onClick={handleCreateBoard}
-                className="flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-lg py-2 text-[#525252] transition-colors hover:bg-[#f5f5f5]"
-              >
-                <Layout className="size-5" strokeWidth={1.5} />
-                <span className="text-[11px] leading-none">Pizarra</span>
-              </button>
+              <BoardPaletteButton
+                canPlaceOnCanvas={Boolean(activeBoardId)}
+                onCreateRoot={handleCreateRootBoard}
+                onStartPlacement={handleStartPlacement}
+              />
             </section>
 
             <section className="border-t border-[#ececec] pt-3">
@@ -252,17 +361,9 @@ export default function Home() {
                     isActive={activeBoardId === board.id}
                     isEditing={editingBoardId === board.id}
                     onOpen={() => openBoard(board.id)}
-                    onContextMenu={(event) => {
-                      const menu = openContextMenu(
-                        event,
-                        board.id,
-                        board.pending,
-                      );
-
-                      if (menu) {
-                        setContextMenu(menu);
-                      }
-                    }}
+                    onContextMenu={(event) =>
+                      openContextMenu(event, board.id, board.pending)
+                    }
                     onRequestEdit={() => setEditingBoardId(board.id)}
                     onFinishEditing={() => setEditingBoardId(null)}
                     onSave={(name) => handleRenameBoard(board.id, name)}
@@ -290,7 +391,10 @@ export default function Home() {
 
         {activeBoardId ? (
           <div className="min-h-0 flex-1">
-            <BoardCanvas>
+            <BoardCanvas
+              ref={canvasRef}
+              placementPreview={placementPreview}
+            >
               {childBoards.map((board) => (
                 <BoardCanvasCard
                   key={board.id}
@@ -299,17 +403,10 @@ export default function Home() {
                   y={board.y}
                   isEditing={editingBoardId === board.id}
                   onOpen={() => openBoard(board.id)}
-                  onContextMenu={(event) => {
-                    const menu = openContextMenu(
-                      event,
-                      board.id,
-                      board.pending,
-                    );
-
-                    if (menu) {
-                      setContextMenu(menu);
-                    }
-                  }}
+                  onMove={(x, y) => handleMoveBoard(board.id, x, y)}
+                  onContextMenu={(event) =>
+                    openContextMenu(event, board.id, board.pending)
+                  }
                   onRequestEdit={() => setEditingBoardId(board.id)}
                   onFinishEditing={() => setEditingBoardId(null)}
                   onSave={(name) => handleRenameBoard(board.id, name)}
