@@ -53,16 +53,14 @@ export default function Home() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-12 shrink-0 border-b border-[#d4d4d4] bg-white shadow-sm">
           {!sidebarOpen ? (
-            <div className="flex h-12 w-[4.75rem] shrink-0 justify-end">
-              <button
-                type="button"
-                aria-label="Abrir panel"
-                onClick={() => setSidebarOpen(true)}
-                className="flex h-12 w-12 items-center justify-center text-[#525252] hover:bg-[#f5f5f5]"
-              >
-                <ChevronRightIcon />
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="Abrir panel"
+              onClick={() => setSidebarOpen(true)}
+              className="flex h-12 w-12 items-center justify-center text-[#525252] hover:bg-[#f5f5f5]"
+            >
+              <ChevronRightIcon />
+            </button>
           ) : null}
         </header>
       </div>
