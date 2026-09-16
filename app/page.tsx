@@ -59,6 +59,8 @@ function previewAt(clientX: number, clientY: number, canvas: BoardCanvasHandle) 
 export default function Home() {
   const canvasRef = useRef<BoardCanvasHandle>(null);
   const suppressCreateClickRef = useRef(false);
+  const childBoardsCacheRef = useRef(new Map<string, BoardListItem[]>());
+  const activeBoardIdRef = useRef<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [boards, setBoards] = useState<BoardListItem[]>([]);
   const [childBoards, setChildBoards] = useState<BoardListItem[]>([]);
@@ -69,16 +71,74 @@ export default function Home() {
     useState<PlacementPreview | null>(null);
 
   useEffect(() => {
+    activeBoardIdRef.current = activeBoardId;
+  }, [activeBoardId]);
+
+  useEffect(() => {
     void listBoardsAction().then(setBoards);
   }, []);
 
-  useEffect(() => {
-    if (!activeBoardId) {
+  const cacheChildBoards = (parentId: string, items: BoardListItem[]) => {
+    childBoardsCacheRef.current.set(parentId, items);
+  };
+
+  const setActiveChildBoards = (
+    parentId: string | null,
+    updater: (current: BoardListItem[]) => BoardListItem[],
+  ) => {
+    setChildBoards((current) => {
+      const next = updater(current);
+
+      if (parentId) {
+        cacheChildBoards(parentId, next);
+      }
+
+      return next;
+    });
+  };
+
+  const prefetchChildBoards = (parentId: string) => {
+    if (childBoardsCacheRef.current.has(parentId)) {
       return;
     }
 
-    void listChildBoardsAction(activeBoardId).then(setChildBoards);
-  }, [activeBoardId]);
+    void listChildBoardsAction(parentId).then((items) => {
+      cacheChildBoards(parentId, items);
+
+      if (activeBoardIdRef.current === parentId) {
+        setChildBoards(items);
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!activeBoardId) {
+      setChildBoards([]);
+      return;
+    }
+
+    const rootBoard = boards.find((board) => board.id === activeBoardId);
+
+    if (rootBoard?.pending) {
+      setChildBoards([]);
+      return;
+    }
+
+    const cached = childBoardsCacheRef.current.get(activeBoardId);
+
+    if (cached) {
+      setChildBoards(cached);
+    }
+
+    void listChildBoardsAction(activeBoardId).then((items) => {
+      if (activeBoardIdRef.current !== activeBoardId) {
+        return;
+      }
+
+      cacheChildBoards(activeBoardId, items);
+      setChildBoards(items);
+    });
+  }, [activeBoardId, boards]);
 
   useEffect(() => {
     if (!contextMenu) {
@@ -97,6 +157,8 @@ export default function Home() {
   }, [contextMenu]);
 
   const openBoard = (boardId: string) => {
+    const cached = childBoardsCacheRef.current.get(boardId);
+    setChildBoards(cached ?? []);
     setActiveBoardId(boardId);
   };
 
@@ -168,16 +230,16 @@ export default function Home() {
       pending: true,
     };
 
-    setChildBoards((current) => [...current, tempBoard]);
+    setActiveChildBoards(activeBoardId, (current) => [...current, tempBoard]);
 
     void createBoardAction({ parentId: activeBoardId, x, y })
       .then((board) => {
-        setChildBoards((current) =>
+        setActiveChildBoards(activeBoardId, (current) =>
           current.map((item) => (item.id === tempId ? board : item)),
         );
       })
       .catch(() => {
-        setChildBoards((current) =>
+        setActiveChildBoards(activeBoardId, (current) =>
           current.filter((item) => item.id !== tempId),
         );
       });
@@ -264,9 +326,17 @@ export default function Home() {
     setBoards((current) =>
       current.map((item) => (item.id === id ? { ...item, name } : item)),
     );
-    setChildBoards((current) =>
-      current.map((item) => (item.id === id ? { ...item, name } : item)),
-    );
+    setChildBoards((current) => {
+      const next = current.map((item) =>
+        item.id === id ? { ...item, name } : item,
+      );
+
+      if (activeBoardIdRef.current) {
+        cacheChildBoards(activeBoardIdRef.current, next);
+      }
+
+      return next;
+    });
 
     void updateBoardNameAction(id, name).catch(() => {
       setBoards(previousBoards);
@@ -283,12 +353,12 @@ export default function Home() {
 
     const previousChildBoards = childBoards;
 
-    setChildBoards((current) =>
+    setActiveChildBoards(activeBoardId, (current) =>
       current.map((item) => (item.id === id ? { ...item, x, y } : item)),
     );
 
     void updateBoardPositionAction(id, x, y).catch(() => {
-      setChildBoards(previousChildBoards);
+      setActiveChildBoards(activeBoardId, () => previousChildBoards);
     });
   };
 
@@ -312,7 +382,14 @@ export default function Home() {
     const previousActiveBoardId = activeBoardId;
 
     setBoards((current) => current.filter((item) => item.id !== id));
-    setChildBoards((current) => current.filter((item) => item.id !== id));
+    setActiveChildBoards(activeBoardId, (current) =>
+      current.filter((item) => item.id !== id),
+    );
+
+    if (board.parentId) {
+      childBoardsCacheRef.current.delete(board.parentId);
+    }
+    childBoardsCacheRef.current.delete(id);
 
     if (activeBoardId === id) {
       setActiveBoardId(board.parentId);
@@ -367,6 +444,11 @@ export default function Home() {
                     isActive={activeBoardId === board.id}
                     isEditing={editingBoardId === board.id}
                     onOpen={() => openBoard(board.id)}
+                    onPrefetch={() => {
+                      if (!board.pending) {
+                        prefetchChildBoards(board.id);
+                      }
+                    }}
                     onContextMenu={(event) =>
                       openContextMenu(event, board.id, board.pending)
                     }
@@ -395,32 +477,29 @@ export default function Home() {
           ) : null}
         </header>
 
-        {activeBoardId ? (
-          <div className="min-h-0 flex-1">
-            <BoardCanvas
-              ref={canvasRef}
-              placementPreview={placementPreview}
-            >
-              {childBoards.map((board) => (
-                <BoardCanvasCard
-                  key={board.id}
-                  name={board.name}
-                  x={board.x}
-                  y={board.y}
-                  isEditing={editingBoardId === board.id}
-                  onOpen={() => openBoard(board.id)}
-                  onMove={(x, y) => handleMoveBoard(board.id, x, y)}
-                  onContextMenu={(event) =>
-                    openContextMenu(event, board.id, board.pending)
-                  }
-                  onRequestEdit={() => setEditingBoardId(board.id)}
-                  onFinishEditing={() => setEditingBoardId(null)}
-                  onSave={(name) => handleRenameBoard(board.id, name)}
-                />
-              ))}
-            </BoardCanvas>
-          </div>
-        ) : null}
+        <div className="min-h-0 flex-1">
+          <BoardCanvas ref={canvasRef} placementPreview={placementPreview}>
+            {activeBoardId
+              ? childBoards.map((board) => (
+                  <BoardCanvasCard
+                    key={board.id}
+                    name={board.name}
+                    x={board.x}
+                    y={board.y}
+                    isEditing={editingBoardId === board.id}
+                    onOpen={() => openBoard(board.id)}
+                    onMove={(x, y) => handleMoveBoard(board.id, x, y)}
+                    onContextMenu={(event) =>
+                      openContextMenu(event, board.id, board.pending)
+                    }
+                    onRequestEdit={() => setEditingBoardId(board.id)}
+                    onFinishEditing={() => setEditingBoardId(null)}
+                    onSave={(name) => handleRenameBoard(board.id, name)}
+                  />
+                ))
+              : null}
+          </BoardCanvas>
+        </div>
       </div>
 
       {contextMenu ? (
