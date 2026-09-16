@@ -1,7 +1,7 @@
 "use client";
 
 import { Layout } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createBoardAction,
   listBoardsAction,
@@ -26,7 +26,8 @@ function BoardName({
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const startEditing = () => {
+  const startEditing = (event: React.MouseEvent) => {
+    event.stopPropagation();
     setDraft(value);
     setEditing(true);
     requestAnimationFrame(() => {
@@ -53,6 +54,7 @@ function BoardName({
       <input
         ref={inputRef}
         value={draft}
+        onClick={(event) => event.stopPropagation()}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={save}
         onKeyDown={(event) => {
@@ -72,48 +74,68 @@ function BoardName({
   }
 
   return (
-    <button
-      type="button"
+    <span
       title={value}
-      onClick={startEditing}
-      className="min-w-0 flex-1 truncate text-left text-[11px] text-[#404040] hover:text-[#171717]"
+      onDoubleClick={startEditing}
+      className="min-w-0 flex-1 truncate text-left text-[11px] text-[#404040]"
     >
       {value}
-    </button>
+    </span>
   );
 }
 
+type BoardListItem = BoardRecord & {
+  pending?: boolean;
+};
+
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [boards, setBoards] = useState<BoardRecord[]>([]);
+  const [boards, setBoards] = useState<BoardListItem[]>([]);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     void listBoardsAction().then(setBoards);
   }, []);
 
   const handleCreateBoard = () => {
-    startTransition(async () => {
-      const board = await createBoardAction();
-      setBoards((current) => [...current, board]);
-      setActiveBoardId(board.id);
-    });
+    const tempId = crypto.randomUUID();
+    const tempBoard: BoardListItem = {
+      id: tempId,
+      name: `Pizarra ${boards.length + 1}`,
+      createdAt: new Date(),
+      pending: true,
+    };
+
+    setBoards((current) => [...current, tempBoard]);
+    setActiveBoardId(tempId);
+
+    void createBoardAction()
+      .then((board) => {
+        setBoards((current) =>
+          current.map((item) => (item.id === tempId ? board : item)),
+        );
+        setActiveBoardId((current) => (current === tempId ? board.id : current));
+      })
+      .catch(() => {
+        setBoards((current) => current.filter((item) => item.id !== tempId));
+        setActiveBoardId((current) => (current === tempId ? null : current));
+      });
   };
 
   const handleRenameBoard = (id: string, name: string) => {
     const previousBoards = boards;
+    const board = boards.find((item) => item.id === id);
+
+    if (board?.pending) {
+      return;
+    }
 
     setBoards((current) =>
-      current.map((board) => (board.id === id ? { ...board, name } : board)),
+      current.map((item) => (item.id === id ? { ...item, name } : item)),
     );
 
-    startTransition(async () => {
-      try {
-        await updateBoardNameAction(id, name);
-      } catch {
-        setBoards(previousBoards);
-      }
+    void updateBoardNameAction(id, name).catch(() => {
+      setBoards(previousBoards);
     });
   };
 
@@ -138,9 +160,8 @@ export default function Home() {
               <button
                 type="button"
                 aria-label="Crear pizarra"
-                disabled={isPending}
                 onClick={handleCreateBoard}
-                className="flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-lg py-2 text-[#525252] transition-colors hover:bg-[#f5f5f5] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full cursor-pointer flex-col items-center gap-1.5 rounded-lg py-2 text-[#525252] transition-colors hover:bg-[#f5f5f5]"
               >
                 <Layout className="size-5" strokeWidth={1.5} />
                 <span className="text-[11px] leading-none">Pizarra</span>
@@ -153,9 +174,13 @@ export default function Home() {
               </h2>
               <div className="flex flex-col gap-0.5">
                 {boards.map((board) => (
-                  <div
+                  <button
                     key={board.id}
-                    className="flex min-w-0 items-center gap-1 rounded-md px-1 py-1.5 hover:bg-[#f5f5f5]"
+                    type="button"
+                    onClick={() => setActiveBoardId(board.id)}
+                    className={`flex min-w-0 cursor-pointer items-center gap-1 rounded-md px-1 py-1.5 text-left hover:bg-[#f5f5f5] ${
+                      activeBoardId === board.id ? "bg-[#f5f5f5]" : ""
+                    }`}
                   >
                     <Layout
                       className="size-3.5 shrink-0 text-[#737373]"
@@ -165,7 +190,7 @@ export default function Home() {
                       value={board.name}
                       onSave={(name) => handleRenameBoard(board.id, name)}
                     />
-                  </div>
+                  </button>
                 ))}
               </div>
             </section>
