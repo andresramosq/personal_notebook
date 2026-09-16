@@ -4,7 +4,6 @@ export type BoardRecord = {
   id: string;
   name: string;
   createdAt: Date;
-  updatedAt: Date;
 };
 
 export async function listBoards(): Promise<BoardRecord[]> {
