@@ -18,7 +18,7 @@ export function WorkspaceApp() {
   const [openDatabaseId, setOpenDatabaseId] = useState<string | null>(null);
 
   const deleteItem = workspace.deleteItem;
-  const resetWorkspace = workspace.resetWorkspace;
+  const hasActiveCanvas = Boolean(workspace.activeCanvas);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -44,6 +44,7 @@ export function WorkspaceApp() {
       }
       if (
         !editing &&
+        hasActiveCanvas &&
         selectedId &&
         (event.key === "Delete" || event.key === "Backspace")
       ) {
@@ -54,7 +55,7 @@ export function WorkspaceApp() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteItem, openDatabaseId, selectedId]);
+  }, [deleteItem, hasActiveCanvas, openDatabaseId, selectedId]);
 
   const visibleItems = useMemo(() => {
     const value = query.trim().toLocaleLowerCase();
@@ -71,26 +72,25 @@ export function WorkspaceApp() {
     return <main className="system-loading">Abriendo Libreta…</main>;
   }
 
-  if (!workspace.activeCanvas) {
-    return (
-      <main className="system-loading">
-        <p>No se pudo abrir tu lienzo guardado.</p>
-        <button type="button" onClick={resetWorkspace}>
-          Empezar de nuevo
-        </button>
-      </main>
-    );
-  }
+  const handleCreateCanvas = () => {
+    setSelectedId(null);
+    setLinkSourceId(null);
+    setOpenDatabaseId(null);
+    setMode("select");
+    workspace.createCanvas();
+  };
 
   const openDatabase = workspace.items.find(
     (item) => item.id === openDatabaseId && item.kind === "database",
   );
 
-  const camera = workspace.state.cameras[workspace.activeCanvas.id] ?? {
-    x: 0,
-    y: 0,
-    zoom: 1,
-  };
+  const camera = workspace.activeCanvas
+    ? (workspace.state.cameras[workspace.activeCanvas.id] ?? {
+        x: 0,
+        y: 0,
+        zoom: 1,
+      })
+    : { x: 0, y: 0, zoom: 1 };
 
   const handleLink = (targetId: string) => {
     if (!linkSourceId) {
@@ -110,7 +110,8 @@ export function WorkspaceApp() {
     <main className="system-shell">
       <WorkspaceSidebar
         canvases={workspace.rootCanvases}
-        activeId={workspace.activeCanvas.id}
+        activeId={workspace.activeCanvas?.id ?? null}
+        hasActiveCanvas={hasActiveCanvas}
         mode={mode}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -119,10 +120,7 @@ export function WorkspaceApp() {
           setLinkSourceId(null);
           workspace.setActiveCanvas(id);
         }}
-        onCreate={() => {
-          setSelectedId(null);
-          workspace.createCanvas();
-        }}
+        onCreate={handleCreateCanvas}
         onDelete={workspace.deleteCanvas}
         onModeChange={(next) => {
           setMode(next);
@@ -141,7 +139,7 @@ export function WorkspaceApp() {
         </button>
 
         <div className="canvas-heading">
-          {workspace.parentCanvas ? (
+          {workspace.activeCanvas && workspace.parentCanvas ? (
             <button
               type="button"
               className="breadcrumb-back"
@@ -150,21 +148,28 @@ export function WorkspaceApp() {
               ← {workspace.parentCanvas.name}
             </button>
           ) : null}
-          <input
-            value={workspace.activeCanvas.name}
-            onChange={(event) => workspace.renameCanvas(event.target.value)}
-            aria-label="Nombre del lienzo"
-          />
+          {workspace.activeCanvas ? (
+            <input
+              value={workspace.activeCanvas.name}
+              onChange={(event) => workspace.renameCanvas(event.target.value)}
+              aria-label="Nombre del lienzo"
+            />
+          ) : (
+            <strong className="app-title">Libreta</strong>
+          )}
         </div>
 
-        <label className="search-box">
-          <Icon name="search" size={15} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar en este lienzo"
-          />
-        </label>
+        {workspace.activeCanvas ? (
+          <label className="search-box">
+            <Icon name="search" size={15} />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar en este lienzo"
+            />
+          </label>
+        ) : null}
+
         <div
           className={`database-status is-${workspace.persistenceStatus}`}
           title={
@@ -185,42 +190,59 @@ export function WorkspaceApp() {
       </header>
 
       <section className="system-content">
-        <CanvasView
-          key={workspace.activeCanvas.id}
-          items={visibleItems}
-          links={workspace.links}
-          camera={camera}
-          selectedId={selectedId}
-          linkSourceId={linkSourceId}
-          mode={mode}
-          onModeChange={setMode}
-          onCameraChange={workspace.updateCamera}
-          onSelect={setSelectedId}
-          onLink={handleLink}
-          onDeleteLink={workspace.deleteLink}
-          onCreate={workspace.createItem}
-          onCreateDrawing={workspace.createDrawing}
-          onUpdate={workspace.updateItem}
-          onDelete={workspace.deleteItem}
-          onDuplicate={(id) => {
-            const nextId = workspace.duplicateItem(id);
-            setSelectedId(nextId);
-            return nextId;
-          }}
-          onConnectStart={setLinkSourceId}
-          onEnterBoard={(item) => {
-            if (item.nestedCanvasId) {
-              setSelectedId(null);
-              setOpenDatabaseId(null);
-              workspace.enterCanvas(item.nestedCanvasId);
-            }
-          }}
-          onOpenDatabase={(item) => {
-            setSelectedId(item.id);
-            setOpenDatabaseId(item.id);
-          }}
-          getNestedPreview={workspace.getNestedPreview}
-        />
+        {workspace.activeCanvas ? (
+          <CanvasView
+            key={workspace.activeCanvas.id}
+            items={visibleItems}
+            links={workspace.links}
+            camera={camera}
+            selectedId={selectedId}
+            linkSourceId={linkSourceId}
+            mode={mode}
+            onModeChange={setMode}
+            onCameraChange={workspace.updateCamera}
+            onSelect={setSelectedId}
+            onLink={handleLink}
+            onDeleteLink={workspace.deleteLink}
+            onCreate={workspace.createItem}
+            onCreateDrawing={workspace.createDrawing}
+            onUpdate={workspace.updateItem}
+            onDelete={workspace.deleteItem}
+            onDuplicate={(id) => {
+              const nextId = workspace.duplicateItem(id);
+              setSelectedId(nextId);
+              return nextId;
+            }}
+            onConnectStart={setLinkSourceId}
+            onEnterBoard={(item) => {
+              if (item.nestedCanvasId) {
+                setSelectedId(null);
+                setOpenDatabaseId(null);
+                workspace.enterCanvas(item.nestedCanvasId);
+              }
+            }}
+            onOpenDatabase={(item) => {
+              setSelectedId(item.id);
+              setOpenDatabaseId(item.id);
+            }}
+            getNestedPreview={workspace.getNestedPreview}
+          />
+        ) : (
+          <div className="workspace-welcome">
+            <div className="workspace-welcome-card">
+              <span className="app-logo">L</span>
+              <h1>Tu libreta está vacía</h1>
+              <p>
+                No hay espacios todavía. Crea uno cuando quieras y organiza
+                notas, pizarras, bases de datos y dibujos a tu manera.
+              </p>
+              <button type="button" onClick={handleCreateCanvas}>
+                <Icon name="plus" size={16} />
+                Crear mi primer espacio
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       {openDatabase ? (

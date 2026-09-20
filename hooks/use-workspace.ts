@@ -196,13 +196,6 @@ export function useWorkspace() {
 
   const deleteCanvas = (id: string) => {
     update((current) => {
-      const rootCount = current.canvases.filter(
-        (canvas) => canvas.parentId === null,
-      ).length;
-      if (rootCount <= 1) {
-        return current;
-      }
-
       const nestedIds = new Set<string>();
       const collectNested = (canvasId: string) => {
         nestedIds.add(canvasId);
@@ -217,12 +210,15 @@ export function useWorkspace() {
       );
       const cameras = { ...current.cameras };
       nestedIds.forEach((canvasId) => delete cameras[canvasId]);
+      const nextActiveCanvasId = nestedIds.has(current.activeCanvasId)
+        ? (canvases.find((canvas) => canvas.parentId === null)?.id ??
+          canvases[0]?.id ??
+          "")
+        : current.activeCanvasId;
 
       return {
         ...current,
-        activeCanvasId: nestedIds.has(current.activeCanvasId)
-          ? canvases[0].id
-          : current.activeCanvasId,
+        activeCanvasId: nextActiveCanvasId,
         canvases,
         items: current.items.filter((item) => !nestedIds.has(item.canvasId)),
         links: current.links.filter((link) => !nestedIds.has(link.canvasId)),
@@ -232,7 +228,7 @@ export function useWorkspace() {
   };
 
   const createItem = (kind: ItemKind, position: { x: number; y: number }) => {
-    if (!state) return "";
+    if (!state?.activeCanvasId) return "";
 
     const id = createId();
     const now = Date.now();
@@ -316,7 +312,7 @@ export function useWorkspace() {
   };
 
   const createDrawing = (worldPoints: DrawingPoint[]) => {
-    if (!state || worldPoints.length < 2) return "";
+    if (!state?.activeCanvasId || worldPoints.length < 2) return "";
 
     const normalized = normalizeDrawingPoints(worldPoints);
     const id = createId();
@@ -471,7 +467,7 @@ export function useWorkspace() {
   };
 
   const createLink = (fromId: string, toId: string) => {
-    if (!state || fromId === toId) return;
+    if (!state?.activeCanvasId || fromId === toId) return;
     const exists = state.links.some(
       (link) =>
         link.canvasId === state.activeCanvasId &&

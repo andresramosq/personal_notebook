@@ -200,9 +200,7 @@ export function readWorkspace(): {
   const rows = db.prepare("SELECT * FROM canvases").all() as CanvasRow[];
 
   if (!rows.length) {
-    const state = createInitialWorkspace();
-    writeWorkspace(state);
-    return { state, isNew: true };
+    return { state: createInitialWorkspace(), isNew: true };
   }
 
   const canvases: WorkspaceCanvas[] = rows.map((row) => ({
@@ -311,12 +309,19 @@ export function readWorkspace(): {
     ),
   );
 
-  const activeCanvasId =
+  const storedActiveCanvasId =
     (
       db
         .prepare("SELECT value FROM workspace_meta WHERE key = ?")
         .get("active_canvas_id") as { value: string } | undefined
-    )?.value ?? canvases[0].id;
+    )?.value ?? "";
+  const activeCanvasId = canvases.some(
+    (canvas) => canvas.id === storedActiveCanvasId,
+  )
+    ? storedActiveCanvasId
+    : (canvases.find((canvas) => canvas.parentId === null)?.id ??
+      canvases[0]?.id ??
+      "");
 
   return {
     isNew: false,
@@ -326,9 +331,7 @@ export function readWorkspace(): {
       items,
       links,
       cameras,
-      activeCanvasId: canvases.some((canvas) => canvas.id === activeCanvasId)
-        ? activeCanvasId
-        : canvases[0].id,
+      activeCanvasId,
     },
   };
 }

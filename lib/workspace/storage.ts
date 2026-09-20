@@ -18,26 +18,13 @@ export function hasLocalWorkspace() {
 }
 
 export function createInitialWorkspace(): WorkspaceState {
-  const now = Date.now();
-  const canvasId = createId();
-
   return {
     version: 3,
-    activeCanvasId: canvasId,
-    canvases: [
-      {
-        id: canvasId,
-        name: "Proyecto Libreta",
-        parentId: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
+    activeCanvasId: "",
+    canvases: [],
     items: [],
     links: [],
-    cameras: {
-      [canvasId]: DEFAULT_CAMERA,
-    },
+    cameras: {},
   };
 }
 
@@ -214,24 +201,13 @@ function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceState {
         }))
     : [];
 
-  if (!canvases.length) {
-    const canvasId = createId();
-    canvases = [
-      {
-        id: canvasId,
-        name: "Proyecto Libreta",
-        parentId: null,
-        createdAt: now,
-        updatedAt: now,
-      },
-    ];
-  }
-
   const canvasIds = new Set(canvases.map((canvas) => canvas.id));
   const activeCanvasId = canvasIds.has(state.activeCanvasId ?? "")
     ? state.activeCanvasId!
-    : (canvases.find((canvas) => canvas.parentId === null)?.id ??
-      canvases[0].id);
+    : canvases.length
+      ? (canvases.find((canvas) => canvas.parentId === null)?.id ??
+        canvases[0].id)
+      : "";
 
   const cameras = { ...(state.cameras ?? {}) };
   for (const canvas of canvases) {

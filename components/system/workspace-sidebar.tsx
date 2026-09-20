@@ -32,7 +32,8 @@ const ELEMENTS: Array<{
 
 type WorkspaceSidebarProps = {
   canvases: WorkspaceCanvas[];
-  activeId: string;
+  activeId: string | null;
+  hasActiveCanvas: boolean;
   mode: CanvasMode;
   open: boolean;
   onClose: () => void;
@@ -45,6 +46,7 @@ type WorkspaceSidebarProps = {
 export function WorkspaceSidebar({
   canvases,
   activeId,
+  hasActiveCanvas,
   mode,
   open,
   onClose,
@@ -84,6 +86,11 @@ export function WorkspaceSidebar({
           </button>
         </div>
         <nav className="canvas-list">
+          {!canvases.length ? (
+            <p className="canvas-list-empty">
+              Sin espacios. Pulsa + para crear el primero.
+            </p>
+          ) : null}
           {canvases.map((canvas) => (
             <div
               key={canvas.id}
@@ -102,24 +109,22 @@ export function WorkspaceSidebar({
                 <Icon name="board" size={16} />
                 <span>{canvas.name}</span>
               </button>
-              {canvases.length > 1 ? (
-                <button
-                  type="button"
-                  className="canvas-row-menu"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `¿Eliminar "${canvas.name}" y todo su contenido?`,
-                      )
-                    ) {
-                      onDelete(canvas.id);
-                    }
-                  }}
-                  aria-label={`Eliminar ${canvas.name}`}
-                >
-                  <Icon name="trash" size={15} />
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="canvas-row-menu"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `¿Eliminar "${canvas.name}" y todo su contenido?`,
+                    )
+                  ) {
+                    onDelete(canvas.id);
+                  }
+                }}
+                aria-label={`Eliminar ${canvas.name}`}
+              >
+                <Icon name="trash" size={15} />
+              </button>
             </div>
           ))}
         </nav>
@@ -134,14 +139,19 @@ export function WorkspaceSidebar({
             const isTool = isConnect || isDraw;
             const isActive =
               (isConnect && mode === "connect") || (isDraw && mode === "draw");
+            const disabled = !hasActiveCanvas && !isTool;
 
             return (
               <button
                 key={element.kind}
                 type="button"
-                className={`palette-item ${isActive ? "is-active" : ""}`}
-                draggable={!isTool}
+                className={`palette-item ${isActive ? "is-active" : ""} ${
+                  disabled ? "is-disabled" : ""
+                }`}
+                draggable={!isTool && hasActiveCanvas}
+                disabled={disabled}
                 onClick={() => {
+                  if (disabled) return;
                   if (isConnect) {
                     onModeChange("connect");
                     return;
@@ -153,7 +163,7 @@ export function WorkspaceSidebar({
                   onModeChange("select");
                 }}
                 onDragStart={(event) => {
-                  if (isTool) return;
+                  if (isTool || !hasActiveCanvas) return;
                   event.dataTransfer.setData(
                     "application/x-libreta-item",
                     element.kind,
@@ -162,11 +172,13 @@ export function WorkspaceSidebar({
                   event.dataTransfer.effectAllowed = "copy";
                 }}
                 title={
-                  isConnect
-                    ? "Conectar dos elementos"
-                    : isDraw
-                      ? "Dibujar trazos libres"
-                      : `${element.label} · arrastra al lienzo`
+                  disabled
+                    ? "Crea un espacio primero"
+                    : isConnect
+                      ? "Conectar dos elementos"
+                      : isDraw
+                        ? "Dibujar trazos libres"
+                        : `${element.label} · arrastra al lienzo`
                 }
               >
                 <span className="palette-icon">
@@ -179,8 +191,9 @@ export function WorkspaceSidebar({
         </div>
 
         <p className="sidebar-hint">
-          Arrastra elementos al lienzo. Usa Dibujo o Conectar para trazos y
-          líneas entre bloques.
+          {hasActiveCanvas
+            ? "Arrastra elementos al lienzo. Usa Dibujo o Conectar para trazos y líneas."
+            : "Empieza creando un espacio. Después podrás añadir lo que quieras."}
         </p>
       </aside>
     </>
