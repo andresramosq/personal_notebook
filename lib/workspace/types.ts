@@ -4,8 +4,9 @@ export type ItemKind =
   | "board"
   | "link"
   | "image"
-  | "database";
-export type CanvasMode = "select" | "hand" | "connect";
+  | "database"
+  | "drawing";
+export type CanvasMode = "select" | "hand" | "connect" | "draw";
 export type ItemColor = "white" | "sand" | "yellow" | "blue" | "green" | "rose";
 export type DatabaseFieldType =
   | "text"
@@ -13,6 +14,11 @@ export type DatabaseFieldType =
   | "date"
   | "select"
   | "checkbox";
+
+export type DrawingPoint = {
+  x: number;
+  y: number;
+};
 
 export type DatabaseField = {
   id: string;
@@ -48,6 +54,9 @@ export type CanvasItem = {
   nestedCanvasId: string | null;
   databaseFields: DatabaseField[];
   databaseRecords: DatabaseRecord[];
+  points: DrawingPoint[];
+  strokeColor: string;
+  strokeWidth: number;
   x: number;
   y: number;
   width: number;
@@ -79,4 +88,4 @@ export type WorkspaceState = {
   activeCanvasId: string;
 };
 
-export type PaletteKind = ItemKind | "connect";
+export type PaletteKind = ItemKind | "connect" | "draw";

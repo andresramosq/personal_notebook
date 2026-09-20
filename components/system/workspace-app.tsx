@@ -28,6 +28,11 @@ export function WorkspaceApp() {
 
       if (!editing && event.key.toLowerCase() === "v") setMode("select");
       if (!editing && event.key.toLowerCase() === "h") setMode("hand");
+      if (!editing && event.key.toLowerCase() === "d") setMode("draw");
+      if (!editing && event.key.toLowerCase() === "c") {
+        setMode("connect");
+        setLinkSourceId(null);
+      }
       if (event.key === "Escape") {
         if (openDatabaseId) {
           setOpenDatabaseId(null);
@@ -194,8 +199,15 @@ export function WorkspaceApp() {
           onLink={handleLink}
           onDeleteLink={workspace.deleteLink}
           onCreate={workspace.createItem}
+          onCreateDrawing={workspace.createDrawing}
           onUpdate={workspace.updateItem}
           onDelete={workspace.deleteItem}
+          onDuplicate={(id) => {
+            const nextId = workspace.duplicateItem(id);
+            setSelectedId(nextId);
+            return nextId;
+          }}
+          onConnectStart={setLinkSourceId}
           onEnterBoard={(item) => {
             if (item.nestedCanvasId) {
               setSelectedId(null);

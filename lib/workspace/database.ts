@@ -115,6 +115,19 @@ db.exec(`
   );
 `);
 
+ensureColumn("canvas_items", "points_json", 'TEXT NOT NULL DEFAULT "[]"');
+ensureColumn("canvas_items", "stroke_color", 'TEXT NOT NULL DEFAULT "#292929"');
+ensureColumn("canvas_items", "stroke_width", "REAL NOT NULL DEFAULT 2");
+
+function ensureColumn(table: string, column: string, definition: string) {
+  const columns = db
+    .prepare(`PRAGMA table_info(${table})`)
+    .all() as Array<{ name: string }>;
+  if (!columns.some((entry) => entry.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 type CanvasRow = {
   id: string;
   name: string;
@@ -136,6 +149,9 @@ type ItemRow = {
   width: number;
   height: number;
   color: ItemColor;
+  points_json: string;
+  stroke_color: string;
+  stroke_width: number;
   created_at: number;
   updated_at: number;
 };
@@ -209,6 +225,9 @@ export function readWorkspace(): {
     nestedCanvasId: row.nested_canvas_id,
     databaseFields: [],
     databaseRecords: [],
+    points: parseDrawingPoints(row.points_json),
+    strokeColor: row.stroke_color ?? "#292929",
+    strokeWidth: row.stroke_width ?? 2,
     x: row.x,
     y: row.y,
     width: row.width,
@@ -337,14 +356,21 @@ const persistWorkspace = db.transaction((state: WorkspaceState) => {
   const insertItem = db.prepare(`
     INSERT INTO canvas_items (
       id, canvas_id, kind, title, content, url, nested_canvas_id,
-      x, y, width, height, color, created_at, updated_at
+      x, y, width, height, color, points_json, stroke_color, stroke_width,
+      created_at, updated_at
     ) VALUES (
       @id, @canvasId, @kind, @title, @content, @url, @nestedCanvasId,
-      @x, @y, @width, @height, @color, @createdAt, @updatedAt
+      @x, @y, @width, @height, @color, @pointsJson, @strokeColor, @strokeWidth,
+      @createdAt, @updatedAt
     )
   `);
   for (const item of state.items) {
-    insertItem.run(item);
+    insertItem.run({
+      ...item,
+      pointsJson: JSON.stringify(item.points ?? []),
+      strokeColor: item.strokeColor ?? "#292929",
+      strokeWidth: item.strokeWidth ?? 2,
+    });
   }
 
   const insertField = db.prepare(`
@@ -415,4 +441,19 @@ const persistWorkspace = db.transaction((state: WorkspaceState) => {
 
 export function writeWorkspace(state: WorkspaceState) {
   persistWorkspace(state);
+}
+
+function parseDrawingPoints(raw: string | undefined) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<{ x?: number; y?: number }>;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (point) => typeof point?.x === "number" && typeof point?.y === "number",
+      )
+      .map((point) => ({ x: point.x!, y: point.y! }));
+  } catch {
+    return [];
+  }
 }

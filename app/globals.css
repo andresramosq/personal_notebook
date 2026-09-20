@@ -369,7 +369,8 @@ button {
   cursor: grabbing;
 }
 
-.canvas-view.mode-connect {
+.canvas-view.mode-connect,
+.canvas-view.mode-draw {
   cursor: crosshair;
 }
 
@@ -388,15 +389,20 @@ button {
   pointer-events: none;
 }
 
-.connection-layer line {
+.connection-layer .connection-path {
+  fill: none;
   stroke: #9696a6;
   stroke-width: 2;
   pointer-events: stroke;
 }
 
-.connection-layer line:hover {
+.connection-layer .connection-path:hover {
   stroke: var(--danger);
   stroke-width: 3;
+}
+
+.connection-layer .drawing-draft {
+  pointer-events: none;
 }
 
 .canvas-item {
@@ -421,6 +427,48 @@ button {
 
 .canvas-item.is-linking {
   cursor: crosshair;
+}
+
+.canvas-item.item-drawing {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.canvas-item.item-drawing.is-selected {
+  outline: 1px dashed var(--accent);
+  outline-offset: 4px;
+}
+
+.drawing-drag-area {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: grab;
+}
+
+.drawing-content {
+  padding: 0;
+  pointer-events: none;
+}
+
+.drawing-svg {
+  display: block;
+  overflow: visible;
+}
+
+.drawing-actions .stroke-color {
+  width: 18px;
+  height: 18px;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+}
+
+.drawing-actions .stroke-color.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .link-target-overlay {
@@ -664,12 +712,50 @@ button {
   font-size: 12px;
 }
 
+.selection-bar-anchor {
+  position: absolute;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  padding: 4px;
+  box-shadow: 0 7px 22px rgb(25 25 20 / 12%);
+}
+
+.selection-bar button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.selection-bar button:hover {
+  background: #f2f2ef;
+}
+
+.selection-bar button.danger:hover {
+  background: #fff0f0;
+  color: var(--danger);
+}
+
 .canvas-tools {
   position: absolute;
   top: 14px;
   right: 14px;
   display: flex;
-  gap: 4px;
+  gap: 2px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: white;
@@ -678,16 +764,27 @@ button {
 }
 
 .canvas-tools button {
-  width: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   height: 32px;
   border: 0;
   border-radius: 6px;
   background: transparent;
-  font-size: 14px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.canvas-tools button span {
+  color: var(--muted);
 }
 
 .canvas-tools button.is-active {
   background: #ececff;
+}
+
+.canvas-tools button.is-active span {
+  color: var(--accent);
 }
 
 .canvas-controls {

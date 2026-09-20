@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/system/icon";
+import { drawingPath } from "@/lib/workspace/drawing";
 import type { CanvasItem, ItemColor } from "@/lib/workspace/types";
 
 type ObjectCardProps = {
@@ -116,7 +117,7 @@ export const ObjectCard = memo(function ObjectCard({
         if (item.kind === "database") onOpenDatabase();
       }}
     >
-      {selected ? (
+      {selected && item.kind !== "drawing" ? (
         <div
           className="item-actions"
           onPointerDown={(event) => event.stopPropagation()}
@@ -145,6 +146,24 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
+      {selected && item.kind === "drawing" ? (
+        <div
+          className="item-actions drawing-actions"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {["#292929", "#5b5bd6", "#c64f4f", "#2f8f4e"].map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={`stroke-color ${item.strokeColor === color ? "is-active" : ""}`}
+              style={{ background: color }}
+              onClick={() => onUpdate({ strokeColor: color })}
+              aria-label={`Trazo ${color}`}
+            />
+          ))}
+        </div>
+      ) : null}
+
       {linking ? (
         <button
           type="button"
@@ -158,8 +177,35 @@ export const ObjectCard = memo(function ObjectCard({
         />
       ) : null}
 
-      <div className="item-drag-area" onPointerDown={startDrag} />
-      <div className="item-content">
+      {item.kind !== "drawing" ? (
+        <div className="item-drag-area" onPointerDown={startDrag} />
+      ) : (
+        <div
+          className="drawing-drag-area"
+          onPointerDown={(event) => {
+            if (event.button !== 0 || linking) return;
+            startDrag(event);
+          }}
+        />
+      )}
+      <div className={`item-content ${item.kind === "drawing" ? "drawing-content" : ""}`}>
+        {item.kind === "drawing" ? (
+          <svg
+            className="drawing-svg"
+            width={item.width}
+            height={item.height}
+            viewBox={`0 0 ${item.width} ${item.height}`}
+          >
+            <path
+              d={drawingPath(item.points)}
+              fill="none"
+              stroke={item.strokeColor}
+              strokeWidth={item.strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : null}
         {item.kind === "text" ? (
           <textarea
             className="text-content"
@@ -316,7 +362,7 @@ export const ObjectCard = memo(function ObjectCard({
         ) : null}
       </div>
 
-      {selected ? (
+      {selected && item.kind !== "drawing" ? (
         <button
           type="button"
           className="resize-handle"

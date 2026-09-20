@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createId } from "@/lib/workspace/id";
+import { normalizeDrawingPoints } from "@/lib/workspace/drawing";
 import {
   createInitialWorkspace,
   hasLocalWorkspace,
   loadWorkspace,
   saveWorkspace,
 } from "@/lib/workspace/storage";
+import type { DrawingPoint } from "@/lib/workspace/types";
 import type {
   CanvasCamera,
   CanvasItem,
@@ -282,6 +284,9 @@ export function useWorkspace() {
             ]
           : [],
       databaseRecords: [],
+      points: [],
+      strokeColor: "#292929",
+      strokeWidth: 2,
       x: position.x,
       y: position.y,
       width: defaultItemWidth(kind),
@@ -308,6 +313,120 @@ export function useWorkspace() {
         item.id === id ? { ...item, ...changes, updatedAt: Date.now() } : item,
       ),
     }));
+  };
+
+  const createDrawing = (worldPoints: DrawingPoint[]) => {
+    if (!state || worldPoints.length < 2) return "";
+
+    const normalized = normalizeDrawingPoints(worldPoints);
+    const id = createId();
+    const now = Date.now();
+    const item: CanvasItem = {
+      id,
+      canvasId: state.activeCanvasId,
+      kind: "drawing",
+      title: "",
+      content: "",
+      url: "",
+      nestedCanvasId: null,
+      databaseFields: [],
+      databaseRecords: [],
+      points: normalized.points,
+      strokeColor: "#292929",
+      strokeWidth: 2,
+      x: normalized.x,
+      y: normalized.y,
+      width: normalized.width,
+      height: normalized.height,
+      color: "white",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    update((current) => ({
+      ...current,
+      items: [...current.items, item],
+    }));
+
+    return id;
+  };
+
+  const duplicateItem = (id: string) => {
+    const newId = createId();
+    update((current) => {
+      const item = current.items.find((candidate) => candidate.id === id);
+      if (!item) return current;
+
+      const now = Date.now();
+      let nestedCanvasId: string | null = null;
+      let extraCanvases = current.canvases;
+      let extraCameras = current.cameras;
+
+      if (item.kind === "board" && item.nestedCanvasId) {
+        nestedCanvasId = createId();
+        extraCanvases = [
+          ...extraCanvases,
+          {
+            id: nestedCanvasId,
+            name: `${item.title || "Pizarra anidada"} (copia)`,
+            parentId: item.canvasId,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ];
+        extraCameras = {
+          ...extraCameras,
+          [nestedCanvasId]: { x: 0, y: 0, zoom: 1 },
+        };
+      }
+
+      const fieldIdMap = new Map<string, string>();
+      const databaseFields = item.databaseFields.map((field) => {
+        const fieldId = createId();
+        fieldIdMap.set(field.id, fieldId);
+        return {
+          ...field,
+          id: fieldId,
+          options: [...field.options],
+        };
+      });
+
+      const databaseRecords = item.databaseRecords.map((record) => {
+        const recordId = createId();
+        const cells: Record<string, string | boolean> = {};
+        for (const [fieldId, value] of Object.entries(record.cells)) {
+          const nextFieldId = fieldIdMap.get(fieldId);
+          if (nextFieldId) cells[nextFieldId] = value;
+        }
+        return {
+          id: recordId,
+          cells,
+          createdAt: now,
+          updatedAt: now,
+        };
+      });
+
+      const duplicate: CanvasItem = {
+        ...item,
+        id: newId,
+        nestedCanvasId,
+        databaseFields,
+        databaseRecords,
+        points: item.points.map((point) => ({ ...point })),
+        x: item.x + 24,
+        y: item.y + 24,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      return {
+        ...current,
+        canvases: item.kind === "board" ? extraCanvases : current.canvases,
+        cameras: item.kind === "board" ? extraCameras : current.cameras,
+        items: [...current.items, duplicate],
+      };
+    });
+    return newId;
   };
 
   const deleteItem = (id: string) => {
@@ -420,6 +539,8 @@ export function useWorkspace() {
     renameCanvas,
     deleteCanvas,
     createItem,
+    createDrawing,
+    duplicateItem,
     updateItem,
     deleteItem,
     createLink,
@@ -446,6 +567,7 @@ function defaultItemWidth(kind: ItemKind) {
   if (kind === "link") return 240;
   if (kind === "image") return 220;
   if (kind === "database") return 420;
+  if (kind === "drawing") return 120;
   return 280;
 }
 
@@ -455,5 +577,6 @@ function defaultItemHeight(kind: ItemKind) {
   if (kind === "link") return 110;
   if (kind === "image") return 160;
   if (kind === "database") return 240;
+  if (kind === "drawing") return 80;
   return 200;
 }

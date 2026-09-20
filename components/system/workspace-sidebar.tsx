@@ -16,7 +16,8 @@ const ELEMENTS: Array<{
     | "link"
     | "board"
     | "database"
-    | "line";
+    | "line"
+    | "pen";
   label: string;
 }> = [
   { kind: "note", icon: "note", label: "Nota" },
@@ -25,7 +26,8 @@ const ELEMENTS: Array<{
   { kind: "link", icon: "link", label: "Enlace" },
   { kind: "board", icon: "board", label: "Pizarra anidada" },
   { kind: "database", icon: "database", label: "Base de datos" },
-  { kind: "connect", icon: "line", label: "Línea" },
+  { kind: "draw", icon: "pen", label: "Dibujo" },
+  { kind: "connect", icon: "line", label: "Conectar" },
 ];
 
 type WorkspaceSidebarProps = {
@@ -128,23 +130,30 @@ export function WorkspaceSidebar({
         <div className="element-palette">
           {ELEMENTS.map((element) => {
             const isConnect = element.kind === "connect";
-            const isActive = isConnect && mode === "connect";
+            const isDraw = element.kind === "draw";
+            const isTool = isConnect || isDraw;
+            const isActive =
+              (isConnect && mode === "connect") || (isDraw && mode === "draw");
 
             return (
               <button
                 key={element.kind}
                 type="button"
                 className={`palette-item ${isActive ? "is-active" : ""}`}
-                draggable={!isConnect}
+                draggable={!isTool}
                 onClick={() => {
                   if (isConnect) {
                     onModeChange("connect");
                     return;
                   }
+                  if (isDraw) {
+                    onModeChange("draw");
+                    return;
+                  }
                   onModeChange("select");
                 }}
                 onDragStart={(event) => {
-                  if (isConnect) return;
+                  if (isTool) return;
                   event.dataTransfer.setData(
                     "application/x-libreta-item",
                     element.kind,
@@ -154,8 +163,10 @@ export function WorkspaceSidebar({
                 }}
                 title={
                   isConnect
-                    ? "Conectar elementos"
-                    : `${element.label} · arrastra al lienzo`
+                    ? "Conectar dos elementos"
+                    : isDraw
+                      ? "Dibujar trazos libres"
+                      : `${element.label} · arrastra al lienzo`
                 }
               >
                 <span className="palette-icon">
@@ -168,7 +179,8 @@ export function WorkspaceSidebar({
         </div>
 
         <p className="sidebar-hint">
-          Arrastra un elemento al lienzo para colocarlo.
+          Arrastra elementos al lienzo. Usa Dibujo o Conectar para trazos y
+          líneas entre bloques.
         </p>
       </aside>
     </>

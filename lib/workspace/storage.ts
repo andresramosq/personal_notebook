@@ -127,6 +127,9 @@ function migrateFromV2(
       nestedCanvasId: item.nestedCanvasId ?? null,
       databaseFields: item.databaseFields ?? [],
       databaseRecords: item.databaseRecords ?? [],
+      points: item.points ?? [],
+      strokeColor: item.strokeColor ?? "#292929",
+      strokeWidth: item.strokeWidth ?? 2,
       x: item.x ?? 120,
       y: item.y ?? 120,
       width: item.width ?? 280,
@@ -168,6 +171,9 @@ function migrateLegacyWorkspace(
       nestedCanvasId: null,
       databaseFields: [],
       databaseRecords: [],
+      points: [],
+      strokeColor: "#292929",
+      strokeWidth: 2,
       x: object.x ?? 120,
       y: object.y ?? 120,
       width: object.width ?? (object.kind === "text" ? 260 : 280),
@@ -288,6 +294,16 @@ function normalizeItem(
     databaseRecords: Array.isArray(item.databaseRecords)
       ? item.databaseRecords
       : [],
+    points: Array.isArray(item.points)
+      ? item.points.filter(
+          (point) =>
+            typeof point?.x === "number" && typeof point?.y === "number",
+        )
+      : [],
+    strokeColor:
+      typeof item.strokeColor === "string" ? item.strokeColor : "#292929",
+    strokeWidth:
+      typeof item.strokeWidth === "number" ? item.strokeWidth : 2,
     x: typeof item.x === "number" ? item.x : 120,
     y: typeof item.y === "number" ? item.y : 120,
     width: typeof item.width === "number" ? item.width : defaultWidth(kind),
@@ -308,6 +324,7 @@ function migrateKind(kind?: string): ItemKind {
   if (kind === "link") return "link";
   if (kind === "image") return "image";
   if (kind === "database") return "database";
+  if (kind === "drawing") return "drawing";
   return "note";
 }
 
@@ -316,6 +333,7 @@ function defaultTitle(kind: ItemKind) {
   if (kind === "link") return "Enlace";
   if (kind === "image") return "Imagen";
   if (kind === "database") return "Base de datos";
+  if (kind === "drawing") return "";
   if (kind === "text") return "";
   return "Nueva nota";
 }
@@ -326,6 +344,7 @@ function defaultWidth(kind: ItemKind) {
   if (kind === "link") return 240;
   if (kind === "image") return 220;
   if (kind === "database") return 420;
+  if (kind === "drawing") return 120;
   return 280;
 }
 
@@ -335,6 +354,7 @@ function defaultHeight(kind: ItemKind) {
   if (kind === "link") return 110;
   if (kind === "image") return 160;
   if (kind === "database") return 240;
+  if (kind === "drawing") return 80;
   return 200;
 }
 

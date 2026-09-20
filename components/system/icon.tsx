@@ -11,6 +11,7 @@ type IconName =
   | "menu"
   | "more"
   | "note"
+  | "pen"
   | "plus"
   | "search"
   | "select"
@@ -74,6 +75,9 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M5 3h11l3 3v15H5z" />
       <path d="M8 11h8M8 15h6M16 3v4h4" />
     </>
+  ),
+  pen: (
+    <path d="M16 4 20 8 9 19l-5 1 1-5zM14 6l4 4" />
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   search: (

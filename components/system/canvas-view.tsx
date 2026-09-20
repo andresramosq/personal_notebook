@@ -1,12 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CanvasSelectionBar } from "@/components/system/canvas-selection-bar";
+import { Icon } from "@/components/system/icon";
 import { ObjectCard } from "@/components/system/object-card";
+import { drawingPath, linkCurvePath } from "@/lib/workspace/drawing";
 import type {
   CanvasCamera,
   CanvasItem,
   CanvasLink,
   CanvasMode,
+  DrawingPoint,
   ItemKind,
 } from "@/lib/workspace/types";
 
@@ -23,8 +27,11 @@ type CanvasViewProps = {
   onLink: (targetId: string) => void;
   onDeleteLink: (linkId: string) => void;
   onCreate: (kind: ItemKind, position: { x: number; y: number }) => string;
+  onCreateDrawing: (points: DrawingPoint[]) => string;
   onUpdate: (id: string, changes: Partial<CanvasItem>) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => string;
+  onConnectStart: (id: string) => void;
   onEnterBoard: (item: CanvasItem) => void;
   onOpenDatabase: (item: CanvasItem) => void;
   getNestedPreview: (canvasId: string) => CanvasItem[];
@@ -53,8 +60,11 @@ export function CanvasView({
   onLink,
   onDeleteLink,
   onCreate,
+  onCreateDrawing,
   onUpdate,
   onDelete,
+  onDuplicate,
+  onConnectStart,
   onEnterBoard,
   onOpenDatabase,
   getNestedPreview,
@@ -62,6 +72,8 @@ export function CanvasView({
   const viewportRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef(camera);
   const [liveCamera, setLiveCamera] = useState(camera);
+  const [draftPoints, setDraftPoints] = useState<DrawingPoint[]>([]);
+  const draftPointsRef = useRef<DrawingPoint[]>([]);
 
   const setCamera = (next: CanvasCamera, persist = true) => {
     cameraRef.current = next;
@@ -100,6 +112,49 @@ export function CanvasView({
       window.removeEventListener("pointerup", stop);
       onCameraChange(cameraRef.current);
     };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+  };
+
+  const startDrawing = (event: React.PointerEvent<HTMLElement>) => {
+    if (mode !== "draw" || event.button !== 0) return;
+    if (event.target !== event.currentTarget) return;
+
+    event.preventDefault();
+    onSelect(null);
+
+    const start = toWorld(event.clientX, event.clientY);
+    const nextPoints = [start];
+    draftPointsRef.current = nextPoints;
+    setDraftPoints(nextPoints);
+
+    const move = (moveEvent: PointerEvent) => {
+      const point = toWorld(moveEvent.clientX, moveEvent.clientY);
+      const last = draftPointsRef.current.at(-1);
+      if (
+        last &&
+        Math.hypot(point.x - last.x, point.y - last.y) < 2 / cameraRef.current.zoom
+      ) {
+        return;
+      }
+      const updated = [...draftPointsRef.current, point];
+      draftPointsRef.current = updated;
+      setDraftPoints(updated);
+    };
+
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      const points = draftPointsRef.current;
+      draftPointsRef.current = [];
+      setDraftPoints([]);
+      if (points.length >= 2) {
+        const id = onCreateDrawing(points);
+        onSelect(id);
+      }
+      onModeChange("select");
+    };
+
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", stop, { once: true });
   };
@@ -159,12 +214,17 @@ export function CanvasView({
   };
 
   const byId = new Map(items.map((item) => [item.id, item]));
+  const selectedItem = selectedId ? byId.get(selectedId) : undefined;
 
   return (
     <section
       ref={viewportRef}
       className={`canvas-view mode-${mode}`}
       onPointerDown={(event) => {
+        if (mode === "draw") {
+          startDrawing(event);
+          return;
+        }
         if (mode === "hand" || event.button === 1) {
           startPan(event);
         } else if (event.target === event.currentTarget) {
@@ -216,17 +276,33 @@ export function CanvasView({
         }}
       >
         <svg className="connection-layer" width="10000" height="10000">
+          <defs>
+            <marker
+              id="link-arrow"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#9696a6" />
+            </marker>
+          </defs>
           {links.map((link) => {
             const from = byId.get(link.fromId);
             const to = byId.get(link.toId);
             if (!from || !to) return null;
+            const x1 = from.x + from.width / 2;
+            const y1 = from.y + from.height / 2;
+            const x2 = to.x + to.width / 2;
+            const y2 = to.y + to.height / 2;
             return (
-              <line
+              <path
                 key={link.id}
-                x1={from.x + from.width / 2}
-                y1={from.y + from.height / 2}
-                x2={to.x + to.width / 2}
-                y2={to.y + to.height / 2}
+                className="connection-path"
+                d={linkCurvePath(x1, y1, x2, y2)}
+                markerEnd="url(#link-arrow)"
                 onDoubleClick={(event) => {
                   event.stopPropagation();
                   onDeleteLink(link.id);
@@ -234,6 +310,17 @@ export function CanvasView({
               />
             );
           })}
+          {draftPoints.length > 1 ? (
+            <path
+              className="drawing-draft"
+              d={drawingPath(draftPoints)}
+              fill="none"
+              stroke="#292929"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : null}
         </svg>
 
         {items.map((item) => (
@@ -269,22 +356,67 @@ export function CanvasView({
         </div>
       ) : null}
 
+      {selectedItem ? (
+        <div
+          className="selection-bar-anchor"
+          style={{
+            left: selectedItem.x * liveCamera.zoom + liveCamera.x + 12,
+            top:
+              selectedItem.y * liveCamera.zoom +
+              liveCamera.y -
+              44,
+          }}
+        >
+          <CanvasSelectionBar
+            onDuplicate={() => onDuplicate(selectedItem.id)}
+            onConnect={() => {
+              onModeChange("connect");
+              onConnectStart(selectedItem.id);
+            }}
+            onDelete={() => {
+              onDelete(selectedItem.id);
+              onSelect(null);
+            }}
+          />
+        </div>
+      ) : null}
+
       <div className="canvas-tools">
         <button
           type="button"
           className={mode === "select" ? "is-active" : ""}
           onClick={() => onModeChange("select")}
-          title="Seleccionar"
+          title="Seleccionar (V)"
         >
-          ↖
+          <Icon name="select" size={16} />
+          <span>Seleccionar</span>
         </button>
         <button
           type="button"
           className={mode === "hand" ? "is-active" : ""}
           onClick={() => onModeChange("hand")}
-          title="Mover lienzo"
+          title="Mover lienzo (H)"
         >
-          ✋
+          <Icon name="hand" size={16} />
+          <span>Mover</span>
+        </button>
+        <button
+          type="button"
+          className={mode === "draw" ? "is-active" : ""}
+          onClick={() => onModeChange("draw")}
+          title="Dibujar (D)"
+        >
+          <Icon name="pen" size={16} />
+          <span>Dibujar</span>
+        </button>
+        <button
+          type="button"
+          className={mode === "connect" ? "is-active" : ""}
+          onClick={() => onModeChange("connect")}
+          title="Conectar (C)"
+        >
+          <Icon name="line" size={16} />
+          <span>Conectar</span>
         </button>
       </div>
 
@@ -319,6 +451,10 @@ export function CanvasView({
             ? "Haz clic en el segundo elemento"
             : "Haz clic en el primer elemento"}
         </div>
+      ) : null}
+
+      {mode === "draw" ? (
+        <div className="connect-hint">Arrastra sobre el lienzo para dibujar</div>
       ) : null}
     </section>
   );
