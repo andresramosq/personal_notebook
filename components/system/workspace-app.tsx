@@ -13,6 +13,9 @@ export function WorkspaceApp() {
   const [mode, setMode] = useState<CanvasMode>("select");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const deleteItem = workspace.deleteItem;
+  const resetWorkspace = workspace.resetWorkspace;
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const editing =
@@ -30,17 +33,28 @@ export function WorkspaceApp() {
         selectedId &&
         (event.key === "Delete" || event.key === "Backspace")
       ) {
-        workspace.deleteItem(selectedId);
+        deleteItem(selectedId);
         setSelectedId(null);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedId, workspace]);
+  }, [deleteItem, selectedId]);
 
-  if (!workspace.state || !workspace.activeCanvas) {
+  if (!workspace.state) {
     return <main className="system-loading">Abriendo Libreta…</main>;
+  }
+
+  if (!workspace.activeCanvas) {
+    return (
+      <main className="system-loading">
+        <p>No se pudo abrir tu lienzo guardado.</p>
+        <button type="button" onClick={resetWorkspace}>
+          Empezar de nuevo
+        </button>
+      </main>
+    );
   }
 
   const camera = workspace.state.cameras[workspace.activeCanvas.id] ?? {

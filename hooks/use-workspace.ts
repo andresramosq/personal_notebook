@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { loadWorkspace, saveWorkspace } from "@/lib/workspace/storage";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createId } from "@/lib/workspace/id";
+import {
+  createInitialWorkspace,
+  loadWorkspace,
+  saveWorkspace,
+} from "@/lib/workspace/storage";
 import type {
   CanvasCamera,
   CanvasItem,
@@ -13,8 +18,9 @@ export function useWorkspace() {
   const [state, setState] = useState<WorkspaceState | null>(null);
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setState(loadWorkspace()));
-    return () => cancelAnimationFrame(frame);
+    // Client-only restore from localStorage after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time bootstrap
+    setState(loadWorkspace());
   }, []);
 
   useEffect(() => {
@@ -40,7 +46,7 @@ export function useWorkspace() {
   };
 
   const createCanvas = () => {
-    const id = crypto.randomUUID();
+    const id = createId();
     const now = Date.now();
     update((current) => ({
       ...current,
@@ -79,19 +85,19 @@ export function useWorkspace() {
     const source = state.canvases.find((canvas) => canvas.id === id);
     if (!source) return;
 
-    const newId = crypto.randomUUID();
+    const newId = createId();
     const now = Date.now();
     const copiedItems = state.items
       .filter((item) => item.canvasId === id)
       .map((item) => ({
         ...item,
-        id: crypto.randomUUID(),
+        id: createId(),
         canvasId: newId,
         createdAt: now,
         updatedAt: now,
         checklist: item.checklist.map((entry) => ({
           ...entry,
-          id: crypto.randomUUID(),
+          id: createId(),
         })),
       }));
 
@@ -144,7 +150,7 @@ export function useWorkspace() {
       return "";
     }
 
-    const id = crypto.randomUUID();
+    const id = createId();
     const now = Date.now();
     const defaults: Record<
       ItemKind,
@@ -175,7 +181,7 @@ export function useWorkspace() {
         width: 300,
         height: 220,
         color: "white",
-        checklist: [{ id: crypto.randomUUID(), text: "", checked: false }],
+        checklist: [{ id: createId(), text: "", checked: false }],
       },
     };
     const preset = defaults[kind];
@@ -222,7 +228,7 @@ export function useWorkspace() {
   const duplicateItem = (id: string) => {
     const item = state?.items.find((candidate) => candidate.id === id);
     if (!item) return "";
-    const newId = crypto.randomUUID();
+    const newId = createId();
     const now = Date.now();
     update((current) => ({
       ...current,
@@ -235,7 +241,7 @@ export function useWorkspace() {
           y: item.y + 28,
           checklist: item.checklist.map((entry) => ({
             ...entry,
-            id: crypto.randomUUID(),
+            id: createId(),
           })),
           createdAt: now,
           updatedAt: now,
@@ -254,6 +260,10 @@ export function useWorkspace() {
       },
     }));
   };
+
+  const resetWorkspace = useCallback(() => {
+    setState(createInitialWorkspace());
+  }, []);
 
   const exportWorkspace = () => {
     if (!state) return;
@@ -283,5 +293,6 @@ export function useWorkspace() {
     deleteItem,
     updateCamera,
     exportWorkspace,
+    resetWorkspace,
   };
 }

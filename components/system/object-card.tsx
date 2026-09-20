@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/system/icon";
+import { createId } from "@/lib/workspace/id";
 import type {
   CanvasItem,
   ChecklistEntry,
@@ -213,7 +214,7 @@ export const ObjectCard = memo(function ObjectCard({
                             checklist: [
                               ...item.checklist,
                               {
-                                id: crypto.randomUUID(),
+                                id: createId(),
                                 text: "",
                                 checked: false,
                               },
@@ -248,7 +249,7 @@ export const ObjectCard = memo(function ObjectCard({
                       checklist: [
                         ...item.checklist,
                         {
-                          id: crypto.randomUUID(),
+                          id: createId(),
                           text: "",
                           checked: false,
                         },

@@ -45,8 +45,19 @@ button {
   display: grid;
   height: 100dvh;
   place-items: center;
+  gap: 12px;
   color: var(--muted);
   font-size: 14px;
+  text-align: center;
+}
+
+.system-loading button {
+  border: 0;
+  border-radius: 8px;
+  background: #2d2d2a;
+  padding: 9px 12px;
+  color: white;
+  font-size: 12px;
 }
 
 .system-shell {
