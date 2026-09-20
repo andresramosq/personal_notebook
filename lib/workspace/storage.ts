@@ -25,6 +25,7 @@ export function createInitialWorkspace(): WorkspaceState {
     items: [],
     links: [],
     cameras: {},
+    trash: [],
   };
 }
 
@@ -127,6 +128,7 @@ function migrateFromV2(
     })),
     links: state.links ?? [],
     cameras: state.cameras ?? {},
+    trash: state.trash ?? [],
   };
 }
 
@@ -235,12 +237,20 @@ function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceState {
       toId: link.toId,
     }));
 
+  const trash = (Array.isArray(state.trash) ? state.trash : [])
+    .filter((entry) => entry?.item?.id)
+    .map((entry) => ({
+      item: normalizeItem(entry.item, now, canvasIds),
+      deletedAt: entry.deletedAt ?? now,
+    }));
+
   return {
     version: 3,
     canvases,
     items,
     links,
     cameras,
+    trash,
     activeCanvasId,
   };
 }
@@ -301,6 +311,10 @@ function migrateKind(kind?: string): ItemKind {
   if (kind === "image") return "image";
   if (kind === "database") return "database";
   if (kind === "drawing") return "drawing";
+  if (kind === "todo") return "todo";
+  if (kind === "kanban") return "kanban";
+  if (kind === "comment") return "comment";
+  if (kind === "line") return "line";
   return "note";
 }
 
@@ -310,6 +324,10 @@ function defaultTitle(kind: ItemKind) {
   if (kind === "image") return "Imagen";
   if (kind === "database") return "Base de datos";
   if (kind === "drawing") return "";
+  if (kind === "todo") return "To-do";
+  if (kind === "kanban") return "Tablero";
+  if (kind === "comment") return "";
+  if (kind === "line") return "";
   if (kind === "text") return "";
   return "Nueva nota";
 }
@@ -321,6 +339,10 @@ function defaultWidth(kind: ItemKind) {
   if (kind === "image") return 220;
   if (kind === "database") return 420;
   if (kind === "drawing") return 120;
+  if (kind === "todo") return 260;
+  if (kind === "kanban") return 480;
+  if (kind === "comment") return 220;
+  if (kind === "line") return 120;
   return 280;
 }
 
@@ -331,6 +353,10 @@ function defaultHeight(kind: ItemKind) {
   if (kind === "image") return 160;
   if (kind === "database") return 240;
   if (kind === "drawing") return 80;
+  if (kind === "todo") return 180;
+  if (kind === "kanban") return 280;
+  if (kind === "comment") return 120;
+  if (kind === "line") return 40;
   return 200;
 }
 

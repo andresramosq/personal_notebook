@@ -1,6 +1,8 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
+import { BlockKanban } from "@/components/system/block-kanban";
+import { BlockTodo } from "@/components/system/block-todo";
 import { Icon } from "@/components/system/icon";
 import { drawingPath } from "@/lib/workspace/drawing";
 import type { CanvasItem, ItemColor } from "@/lib/workspace/types";
@@ -101,7 +103,9 @@ export const ObjectCard = memo(function ObjectCard({
     <article
       className={`canvas-item item-${item.kind} color-${item.color} ${
         selected ? "is-selected" : ""
-      } ${linking ? "is-linking" : ""}`}
+      } ${linking ? "is-linking" : ""} ${
+        item.kind === "line" || item.kind === "drawing" ? "item-stroke" : ""
+      }`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
         width: item.width,
@@ -117,7 +121,10 @@ export const ObjectCard = memo(function ObjectCard({
         if (item.kind === "database") onOpenDatabase();
       }}
     >
-      {selected && item.kind !== "drawing" ? (
+      {selected &&
+      item.kind !== "drawing" &&
+      item.kind !== "line" &&
+      item.kind !== "kanban" ? (
         <div
           className="item-actions"
           onPointerDown={(event) => event.stopPropagation()}
@@ -146,7 +153,18 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
-      {selected && item.kind === "drawing" ? (
+      {linking &&
+      item.kind !== "drawing" &&
+      item.kind !== "line" ? (
+        <>
+          <span className="link-port link-port-n" />
+          <span className="link-port link-port-e" />
+          <span className="link-port link-port-s" />
+          <span className="link-port link-port-w" />
+        </>
+      ) : null}
+
+      {selected && (item.kind === "drawing" || item.kind === "line") ? (
         <div
           className="item-actions drawing-actions"
           onPointerDown={(event) => event.stopPropagation()}
@@ -164,7 +182,9 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
-      {linking ? (
+      {linking &&
+      item.kind !== "drawing" &&
+      item.kind !== "line" ? (
         <button
           type="button"
           className="link-target-overlay"
@@ -177,7 +197,7 @@ export const ObjectCard = memo(function ObjectCard({
         />
       ) : null}
 
-      {item.kind !== "drawing" ? (
+      {item.kind !== "drawing" && item.kind !== "line" ? (
         <div className="item-drag-area" onPointerDown={startDrag} />
       ) : (
         <div
@@ -188,7 +208,13 @@ export const ObjectCard = memo(function ObjectCard({
           }}
         />
       )}
-      <div className={`item-content ${item.kind === "drawing" ? "drawing-content" : ""}`}>
+      <div
+        className={`item-content ${
+          item.kind === "drawing" || item.kind === "line"
+            ? "drawing-content"
+            : ""
+        } ${item.kind === "comment" ? "comment-content" : ""}`}
+      >
         {item.kind === "drawing" ? (
           <svg
             className="drawing-svg"
@@ -203,6 +229,37 @@ export const ObjectCard = memo(function ObjectCard({
               strokeWidth={item.strokeWidth}
               strokeLinecap="round"
               strokeLinejoin="round"
+            />
+          </svg>
+        ) : null}
+        {item.kind === "line" && item.points.length >= 2 ? (
+          <svg
+            className="drawing-svg line-svg"
+            width={item.width}
+            height={item.height}
+            viewBox={`0 0 ${item.width} ${item.height}`}
+          >
+            <defs>
+              <marker
+                id={`line-arrow-${item.id}`}
+                viewBox="0 0 10 10"
+                refX="8"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill={item.strokeColor} />
+              </marker>
+            </defs>
+            <line
+              x1={item.points[0].x}
+              y1={item.points[0].y}
+              x2={item.points[1].x}
+              y2={item.points[1].y}
+              stroke={item.strokeColor}
+              strokeWidth={item.strokeWidth}
+              markerEnd={`url(#line-arrow-${item.id})`}
             />
           </svg>
         ) : null}
@@ -323,6 +380,58 @@ export const ObjectCard = memo(function ObjectCard({
           </>
         ) : null}
 
+        {item.kind === "todo" ? (
+          <>
+            <div className="todo-header">
+              <Icon name="todo" size={15} />
+              <input
+                className="item-title"
+                value={item.title}
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ title: event.target.value })}
+              />
+            </div>
+            <BlockTodo
+              content={item.content}
+              onChange={(next) => onUpdate({ content: next })}
+            />
+          </>
+        ) : null}
+
+        {item.kind === "kanban" ? (
+          <>
+            <div className="kanban-header">
+              <Icon name="kanban" size={15} />
+              <input
+                className="item-title"
+                value={item.title}
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ title: event.target.value })}
+              />
+            </div>
+            <BlockKanban
+              content={item.content}
+              onChange={(next) => onUpdate({ content: next })}
+            />
+          </>
+        ) : null}
+
+        {item.kind === "comment" ? (
+          <>
+            <div className="comment-header">
+              <Icon name="comment" size={15} />
+              <span>Comentario</span>
+            </div>
+            <textarea
+              className="comment-content"
+              value={item.content}
+              placeholder="Escribe tu comentario…"
+              onPointerDown={(event) => event.stopPropagation()}
+              onChange={(event) => onUpdate({ content: event.target.value })}
+            />
+          </>
+        ) : null}
+
         {item.kind === "database" ? (
           <>
             <div className="database-card-header">
@@ -362,7 +471,9 @@ export const ObjectCard = memo(function ObjectCard({
         ) : null}
       </div>
 
-      {selected && item.kind !== "drawing" ? (
+      {selected &&
+      item.kind !== "drawing" &&
+      item.kind !== "line" ? (
         <button
           type="button"
           className="resize-handle"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { CanvasPalette } from "@/components/system/canvas-palette";
 import { CanvasSelectionBar } from "@/components/system/canvas-selection-bar";
 import { Icon } from "@/components/system/icon";
 import { ObjectCard } from "@/components/system/object-card";
@@ -28,6 +29,9 @@ type CanvasViewProps = {
   onDeleteLink: (linkId: string) => void;
   onCreate: (kind: ItemKind, position: { x: number; y: number }) => string;
   onCreateDrawing: (points: DrawingPoint[]) => string;
+  onCreateLine: (points: DrawingPoint[]) => string;
+  trashCount: number;
+  onOpenTrash: () => void;
   onUpdate: (id: string, changes: Partial<CanvasItem>) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => string;
@@ -45,6 +49,9 @@ const ITEM_KINDS: ItemKind[] = [
   "link",
   "board",
   "database",
+  "todo",
+  "kanban",
+  "comment",
 ];
 
 export function CanvasView({
@@ -61,6 +68,9 @@ export function CanvasView({
   onDeleteLink,
   onCreate,
   onCreateDrawing,
+  onCreateLine,
+  trashCount,
+  onOpenTrash,
   onUpdate,
   onDelete,
   onDuplicate,
@@ -116,8 +126,11 @@ export function CanvasView({
     window.addEventListener("pointerup", stop, { once: true });
   };
 
-  const startDrawing = (event: React.PointerEvent<HTMLElement>) => {
-    if (mode !== "draw" || event.button !== 0) return;
+  const startStroke = (
+    event: React.PointerEvent<HTMLElement>,
+    strokeMode: "draw" | "line",
+  ) => {
+    if (mode !== strokeMode || event.button !== 0) return;
     if (event.target !== event.currentTarget) return;
 
     event.preventDefault();
@@ -130,10 +143,17 @@ export function CanvasView({
 
     const move = (moveEvent: PointerEvent) => {
       const point = toWorld(moveEvent.clientX, moveEvent.clientY);
+      if (strokeMode === "line") {
+        const updated = [start, point];
+        draftPointsRef.current = updated;
+        setDraftPoints(updated);
+        return;
+      }
       const last = draftPointsRef.current.at(-1);
       if (
         last &&
-        Math.hypot(point.x - last.x, point.y - last.y) < 2 / cameraRef.current.zoom
+        Math.hypot(point.x - last.x, point.y - last.y) <
+          2 / cameraRef.current.zoom
       ) {
         return;
       }
@@ -149,7 +169,10 @@ export function CanvasView({
       draftPointsRef.current = [];
       setDraftPoints([]);
       if (points.length >= 2) {
-        const id = onCreateDrawing(points);
+        const id =
+          strokeMode === "line"
+            ? onCreateLine(points)
+            : onCreateDrawing(points);
         onSelect(id);
       }
       onModeChange("select");
@@ -222,7 +245,11 @@ export function CanvasView({
       className={`canvas-view mode-${mode}`}
       onPointerDown={(event) => {
         if (mode === "draw") {
-          startDrawing(event);
+          startStroke(event, "draw");
+          return;
+        }
+        if (mode === "line") {
+          startStroke(event, "line");
           return;
         }
         if (mode === "hand" || event.button === 1) {
@@ -352,9 +379,17 @@ export function CanvasView({
       {!items.length ? (
         <div className="canvas-empty">
           <strong>Este lienzo está vacío</strong>
-          <span>Arrastra un elemento desde la barra lateral.</span>
+          <span>Arrastra un bloque desde la barra de herramientas.</span>
         </div>
       ) : null}
+
+      <CanvasPalette
+        mode={mode}
+        trashCount={trashCount}
+        onModeChange={onModeChange}
+        onDragKind={() => undefined}
+        onOpenTrash={onOpenTrash}
+      />
 
       {selectedItem ? (
         <div
@@ -400,24 +435,6 @@ export function CanvasView({
           <Icon name="hand" size={16} />
           <span>Mover</span>
         </button>
-        <button
-          type="button"
-          className={mode === "draw" ? "is-active" : ""}
-          onClick={() => onModeChange("draw")}
-          title="Dibujar (D)"
-        >
-          <Icon name="pen" size={16} />
-          <span>Dibujar</span>
-        </button>
-        <button
-          type="button"
-          className={mode === "connect" ? "is-active" : ""}
-          onClick={() => onModeChange("connect")}
-          title="Conectar (C)"
-        >
-          <Icon name="line" size={16} />
-          <span>Conectar</span>
-        </button>
       </div>
 
       <div className="canvas-controls">
@@ -455,6 +472,12 @@ export function CanvasView({
 
       {mode === "draw" ? (
         <div className="connect-hint">Arrastra sobre el lienzo para dibujar</div>
+      ) : null}
+
+      {mode === "line" ? (
+        <div className="connect-hint">
+          Arrastra para crear una flecha en el diagrama
+        </div>
       ) : null}
     </section>
   );

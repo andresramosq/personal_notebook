@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
 import { DatabaseView } from "@/components/system/database-view";
 import { Icon } from "@/components/system/icon";
+import { TrashPanel } from "@/components/system/trash-panel";
 import { WorkspaceSidebar } from "@/components/system/workspace-sidebar";
 import { useWorkspace } from "@/hooks/use-workspace";
 import type { CanvasMode } from "@/lib/workspace/types";
@@ -16,6 +17,7 @@ export function WorkspaceApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [openDatabaseId, setOpenDatabaseId] = useState<string | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   const deleteItem = workspace.deleteItem;
   const hasActiveCanvas = Boolean(workspace.activeCanvas);
@@ -111,8 +113,6 @@ export function WorkspaceApp() {
       <WorkspaceSidebar
         canvases={workspace.rootCanvases}
         activeId={workspace.activeCanvas?.id ?? null}
-        hasActiveCanvas={hasActiveCanvas}
-        mode={mode}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onSelect={(id) => {
@@ -122,10 +122,6 @@ export function WorkspaceApp() {
         }}
         onCreate={handleCreateCanvas}
         onDelete={workspace.deleteCanvas}
-        onModeChange={(next) => {
-          setMode(next);
-          if (next !== "connect") setLinkSourceId(null);
-        }}
       />
 
       <header className="system-header">
@@ -205,8 +201,11 @@ export function WorkspaceApp() {
             onLink={handleLink}
             onDeleteLink={workspace.deleteLink}
             onCreate={workspace.createItem}
-            onCreateDrawing={workspace.createDrawing}
-            onUpdate={workspace.updateItem}
+          onCreateDrawing={workspace.createDrawing}
+          onCreateLine={workspace.createLine}
+          trashCount={workspace.trash.length}
+          onOpenTrash={() => setTrashOpen(true)}
+          onUpdate={workspace.updateItem}
             onDelete={workspace.deleteItem}
             onDuplicate={(id) => {
               const nextId = workspace.duplicateItem(id);
@@ -250,6 +249,15 @@ export function WorkspaceApp() {
           item={openDatabase}
           onUpdate={(changes) => workspace.updateItem(openDatabase.id, changes)}
           onClose={() => setOpenDatabaseId(null)}
+        />
+      ) : null}
+
+      {trashOpen ? (
+        <TrashPanel
+          entries={workspace.trash}
+          onRestore={(itemId) => workspace.restoreFromTrash(itemId)}
+          onPurge={(itemId) => workspace.purgeFromTrash(itemId)}
+          onClose={() => setTrashOpen(false)}
         />
       ) : null}
     </main>

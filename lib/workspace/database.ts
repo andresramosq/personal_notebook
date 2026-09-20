@@ -13,6 +13,7 @@ import type {
   DatabaseRecord,
   ItemColor,
   ItemKind,
+  TrashEntry,
   WorkspaceCanvas,
   WorkspaceState,
 } from "@/lib/workspace/types";
@@ -112,6 +113,13 @@ db.exec(`
     x REAL NOT NULL,
     y REAL NOT NULL,
     zoom REAL NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS trash_items (
+    id TEXT PRIMARY KEY,
+    canvas_id TEXT NOT NULL,
+    item_json TEXT NOT NULL,
+    deleted_at INTEGER NOT NULL
   );
 `);
 
@@ -323,6 +331,20 @@ export function readWorkspace(): {
       canvases[0]?.id ??
       "");
 
+  const trash = (
+    db
+      .prepare("SELECT * FROM trash_items ORDER BY deleted_at DESC")
+      .all() as Array<{
+      id: string;
+      canvas_id: string;
+      item_json: string;
+      deleted_at: number;
+    }>
+  ).map((row): TrashEntry => ({
+    item: JSON.parse(row.item_json) as CanvasItem,
+    deletedAt: row.deleted_at,
+  }));
+
   return {
     isNew: false,
     state: {
@@ -331,6 +353,7 @@ export function readWorkspace(): {
       items,
       links,
       cameras,
+      trash,
       activeCanvasId,
     },
   };
@@ -343,6 +366,7 @@ const persistWorkspace = db.transaction((state: WorkspaceState) => {
   db.prepare("DELETE FROM database_fields").run();
   db.prepare("DELETE FROM canvas_items").run();
   db.prepare("DELETE FROM canvas_cameras").run();
+  db.prepare("DELETE FROM trash_items").run();
   db.prepare("DELETE FROM canvases").run();
   db.prepare("DELETE FROM workspace_meta").run();
 
@@ -434,6 +458,19 @@ const persistWorkspace = db.transaction((state: WorkspaceState) => {
   for (const canvas of state.canvases) {
     const camera = state.cameras[canvas.id] ?? { x: 0, y: 0, zoom: 1 };
     insertCamera.run(canvas.id, camera.x, camera.y, camera.zoom);
+  }
+
+  const insertTrash = db.prepare(`
+    INSERT INTO trash_items (id, canvas_id, item_json, deleted_at)
+    VALUES (?, ?, ?, ?)
+  `);
+  for (const entry of state.trash ?? []) {
+    insertTrash.run(
+      entry.item.id,
+      entry.item.canvasId,
+      JSON.stringify(entry.item),
+      entry.deletedAt,
+    );
   }
 
   db.prepare("INSERT INTO workspace_meta (key, value) VALUES (?, ?)").run(

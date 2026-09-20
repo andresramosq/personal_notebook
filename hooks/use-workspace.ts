@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createId } from "@/lib/workspace/id";
+import {
+  createDefaultKanbanContent,
+  createDefaultTodoContent,
+} from "@/lib/workspace/blocks";
 import { normalizeDrawingPoints } from "@/lib/workspace/drawing";
 import {
   createInitialWorkspace,
@@ -259,7 +263,16 @@ export function useWorkspace() {
       canvasId: state.activeCanvasId,
       kind,
       title: defaultItemTitle(kind),
-      content: kind === "text" ? "Escribe un texto" : "",
+      content:
+        kind === "text"
+          ? "Escribe un texto"
+          : kind === "todo"
+            ? createDefaultTodoContent()
+            : kind === "kanban"
+              ? createDefaultKanbanContent()
+              : kind === "comment"
+                ? "Escribe tu comentario…"
+                : "",
       url: kind === "link" ? "https://" : "",
       nestedCanvasId,
       databaseFields:
@@ -287,7 +300,14 @@ export function useWorkspace() {
       y: position.y,
       width: defaultItemWidth(kind),
       height: defaultItemHeight(kind),
-      color: kind === "note" ? "yellow" : "white",
+      color:
+        kind === "note"
+          ? "yellow"
+          : kind === "comment"
+            ? "sand"
+            : kind === "kanban"
+              ? "blue"
+              : "white",
       createdAt: now,
       updatedAt: now,
     };
@@ -296,6 +316,45 @@ export function useWorkspace() {
       ...current,
       canvases: kind === "board" ? extraCanvases : current.canvases,
       cameras: kind === "board" ? extraCameras : current.cameras,
+      items: [...current.items, item],
+    }));
+
+    return id;
+  };
+
+  const createLine = (worldPoints: DrawingPoint[]) => {
+    if (!state?.activeCanvasId || worldPoints.length < 2) return "";
+
+    const normalized = normalizeDrawingPoints([
+      worldPoints[0],
+      worldPoints.at(-1)!,
+    ]);
+    const id = createId();
+    const now = Date.now();
+    const item: CanvasItem = {
+      id,
+      canvasId: state.activeCanvasId,
+      kind: "line",
+      title: "",
+      content: "",
+      url: "",
+      nestedCanvasId: null,
+      databaseFields: [],
+      databaseRecords: [],
+      points: normalized.points,
+      strokeColor: "#292929",
+      strokeWidth: 2,
+      x: normalized.x,
+      y: normalized.y,
+      width: normalized.width,
+      height: normalized.height,
+      color: "white",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    update((current) => ({
+      ...current,
       items: [...current.items, item],
     }));
 
@@ -428,8 +487,10 @@ export function useWorkspace() {
   const deleteItem = (id: string) => {
     update((current) => {
       const item = current.items.find((candidate) => candidate.id === id);
+      if (!item) return current;
+
       const nestedIds = new Set<string>();
-      if (item?.kind === "board" && item.nestedCanvasId) {
+      if (item.kind === "board" && item.nestedCanvasId) {
         const collectNested = (canvasId: string) => {
           nestedIds.add(canvasId);
           current.canvases
@@ -444,14 +505,21 @@ export function useWorkspace() {
       );
       const cameras = { ...current.cameras };
       nestedIds.forEach((canvasId) => delete cameras[canvasId]);
+      const nextActiveCanvasId = nestedIds.has(current.activeCanvasId)
+        ? (canvases.find((canvas) => canvas.parentId === null)?.id ??
+          canvases[0]?.id ??
+          "")
+        : current.activeCanvasId;
 
       return {
         ...current,
-        activeCanvasId: nestedIds.has(current.activeCanvasId)
-          ? (item?.canvasId ?? canvases[0].id)
-          : current.activeCanvasId,
+        activeCanvasId: nextActiveCanvasId,
         canvases,
         cameras,
+        trash: [
+          { item, deletedAt: Date.now() },
+          ...current.trash.filter((entry) => entry.item.id !== item.id),
+        ],
         items: current.items.filter(
           (candidate) =>
             candidate.id !== id && !nestedIds.has(candidate.canvasId),
@@ -464,6 +532,31 @@ export function useWorkspace() {
         ),
       };
     });
+  };
+
+  const restoreFromTrash = (itemId: string) => {
+    update((current) => {
+      const entry = current.trash.find((candidate) => candidate.item.id === itemId);
+      if (!entry) return current;
+
+      const canvasExists = current.canvases.some(
+        (canvas) => canvas.id === entry.item.canvasId,
+      );
+      if (!canvasExists) return current;
+
+      return {
+        ...current,
+        items: [...current.items, entry.item],
+        trash: current.trash.filter((candidate) => candidate.item.id !== itemId),
+      };
+    });
+  };
+
+  const purgeFromTrash = (itemId: string) => {
+    update((current) => ({
+      ...current,
+      trash: current.trash.filter((candidate) => candidate.item.id !== itemId),
+    }));
   };
 
   const createLink = (fromId: string, toId: string) => {
@@ -536,9 +629,13 @@ export function useWorkspace() {
     deleteCanvas,
     createItem,
     createDrawing,
+    createLine,
     duplicateItem,
     updateItem,
     deleteItem,
+    restoreFromTrash,
+    purgeFromTrash,
+    trash: state?.trash ?? [],
     createLink,
     deleteLink,
     updateCamera,
@@ -553,6 +650,9 @@ function defaultItemTitle(kind: ItemKind) {
   if (kind === "link") return "Enlace";
   if (kind === "image") return "Imagen";
   if (kind === "database") return "Base de datos";
+  if (kind === "todo") return "To-do";
+  if (kind === "kanban") return "Tablero";
+  if (kind === "comment") return "";
   if (kind === "text") return "";
   return "Nueva nota";
 }
@@ -564,6 +664,10 @@ function defaultItemWidth(kind: ItemKind) {
   if (kind === "image") return 220;
   if (kind === "database") return 420;
   if (kind === "drawing") return 120;
+  if (kind === "todo") return 260;
+  if (kind === "kanban") return 480;
+  if (kind === "comment") return 220;
+  if (kind === "line") return 120;
   return 280;
 }
 
@@ -574,5 +678,9 @@ function defaultItemHeight(kind: ItemKind) {
   if (kind === "image") return 160;
   if (kind === "database") return 240;
   if (kind === "drawing") return 80;
+  if (kind === "todo") return 180;
+  if (kind === "kanban") return 280;
+  if (kind === "comment") return 120;
+  if (kind === "line") return 40;
   return 200;
 }

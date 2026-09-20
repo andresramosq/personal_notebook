@@ -2,10 +2,13 @@ type IconName =
   | "board"
   | "chevron"
   | "close"
+  | "comment"
+  | "connect"
   | "copy"
   | "database"
   | "hand"
   | "image"
+  | "kanban"
   | "line"
   | "link"
   | "menu"
@@ -16,7 +19,9 @@ type IconName =
   | "search"
   | "select"
   | "text"
-  | "trash";
+  | "todo"
+  | "trash"
+  | "upload";
 
 type IconProps = {
   name: IconName;
@@ -32,6 +37,14 @@ const paths: Record<IconName, React.ReactNode> = {
   ),
   chevron: <path d="m9 18 6-6-6-6" />,
   close: <path d="M18 6 6 18M6 6l12 12" />,
+  comment: <path d="M21 11.5a8.4 8.4 0 0 1-8.4 8.4H7l-4 3V11.5A8.4 8.4 0 0 1 11.4 3h.2A8.4 8.4 0 0 1 21 11.5z" />,
+  connect: (
+    <>
+      <circle cx="6" cy="12" r="2" />
+      <circle cx="18" cy="12" r="2" />
+      <path d="M8 12h8" />
+    </>
+  ),
   copy: (
     <>
       <rect x="8" y="8" width="12" height="12" rx="2" />
@@ -53,6 +66,13 @@ const paths: Record<IconName, React.ReactNode> = {
       <rect x="4" y="5" width="16" height="14" rx="2" />
       <circle cx="9" cy="10" r="1.5" />
       <path d="m4 16 5-5 4 4 3-3 4 4" />
+    </>
+  ),
+  kanban: (
+    <>
+      <rect x="4" y="5" width="5" height="14" rx="1.5" />
+      <rect x="10" y="5" width="5" height="14" rx="1.5" />
+      <rect x="16" y="5" width="4" height="14" rx="1.5" />
     </>
   ),
   line: <path d="m5 19 7-7 4 4 6-6" />,
@@ -88,10 +108,22 @@ const paths: Record<IconName, React.ReactNode> = {
   ),
   select: <path d="m5 3 14 9-6 2-3 6z" />,
   text: <path d="M5 5h14M12 5v14M8 19h8" />,
+  todo: (
+    <>
+      <rect x="4" y="5" width="16" height="16" rx="2" />
+      <path d="m8 12 3 3 5-6" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14" />
       <path d="M10 11v6M14 11v6" />
+    </>
+  ),
+  upload: (
+    <>
+      <path d="M12 4v10M8 10l4-4 4 4" />
+      <path d="M5 20h14" />
     </>
   ),
 };

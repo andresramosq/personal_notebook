@@ -5,8 +5,12 @@ export type ItemKind =
   | "link"
   | "image"
   | "database"
-  | "drawing";
-export type CanvasMode = "select" | "hand" | "connect" | "draw";
+  | "drawing"
+  | "todo"
+  | "kanban"
+  | "comment"
+  | "line";
+export type CanvasMode = "select" | "hand" | "connect" | "draw" | "line";
 export type ItemColor = "white" | "sand" | "yellow" | "blue" | "green" | "rose";
 export type DatabaseFieldType =
   | "text"
@@ -79,13 +83,19 @@ export type CanvasCamera = {
   zoom: number;
 };
 
+export type TrashEntry = {
+  item: CanvasItem;
+  deletedAt: number;
+};
+
 export type WorkspaceState = {
   version: 3;
   canvases: WorkspaceCanvas[];
   items: CanvasItem[];
   links: CanvasLink[];
   cameras: Record<string, CanvasCamera>;
+  trash: TrashEntry[];
   activeCanvasId: string;
 };
 
-export type PaletteKind = ItemKind | "connect" | "draw";
+export type PaletteKind = ItemKind | "connect" | "draw" | "trash";
