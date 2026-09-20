@@ -43,8 +43,12 @@ export function useCanvasItems() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    setItems(loadCanvasItems());
-    setIsReady(true);
+    const frame = window.requestAnimationFrame(() => {
+      setItems(loadCanvasItems());
+      setIsReady(true);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {

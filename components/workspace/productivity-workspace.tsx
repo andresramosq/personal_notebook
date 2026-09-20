@@ -47,7 +47,12 @@ export function ProductivityWorkspace() {
     const { x, y, zoom } = cameraRef.current;
     const worldX = (rect.width / 2 - x) / zoom;
     const worldY = (rect.height / 2 - y) / zoom;
-    const id = createItem(type, worldX - 130, worldY - 90);
+    const offset = (items.length % 6) * 24;
+    const id = createItem(
+      type,
+      worldX - 130 + offset,
+      worldY - 90 + offset,
+    );
     setSelectedId(id);
   };
 
