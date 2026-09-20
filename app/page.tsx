@@ -1,3 +1,5 @@
+import { ProductivityWorkspace } from "@/components/workspace/productivity-workspace";
+
 export default function Home() {
-  return <main className="min-h-screen bg-white" />;
+  return <ProductivityWorkspace />;
 }
