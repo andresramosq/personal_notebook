@@ -279,7 +279,11 @@ export function CanvasView({
       </div>
 
       <div className="canvas-controls">
-        <button type="button" onClick={() => zoomAtCenter(0.85)} aria-label="Alejar">
+        <button
+          type="button"
+          onClick={() => zoomAtCenter(0.85)}
+          aria-label="Alejar"
+        >
           −
         </button>
         <button
@@ -290,7 +294,11 @@ export function CanvasView({
         >
           {Math.round(liveCamera.zoom * 100)}%
         </button>
-        <button type="button" onClick={() => zoomAtCenter(1.15)} aria-label="Acercar">
+        <button
+          type="button"
+          onClick={() => zoomAtCenter(1.15)}
+          aria-label="Acercar"
+        >
           +
         </button>
       </div>

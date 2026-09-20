@@ -159,7 +159,9 @@ export function WorkspaceSidebar({
           })}
         </div>
 
-        <p className="sidebar-hint">Arrastra un elemento al lienzo para colocarlo.</p>
+        <p className="sidebar-hint">
+          Arrastra un elemento al lienzo para colocarlo.
+        </p>
       </aside>
     </>
   );

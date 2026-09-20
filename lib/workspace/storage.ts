@@ -10,6 +10,13 @@ import type {
 const STORAGE_KEY = "libreta:workspace:v1";
 const DEFAULT_CAMERA = { x: 0, y: 0, zoom: 1 };
 
+export function hasLocalWorkspace() {
+  return (
+    typeof window !== "undefined" &&
+    window.localStorage.getItem(STORAGE_KEY) !== null
+  );
+}
+
 export function createInitialWorkspace(): WorkspaceState {
   const now = Date.now();
   const canvasId = createId();
@@ -98,7 +105,9 @@ type LegacyWorkspace = {
   }>;
 };
 
-function migrateFromV2(state: Partial<WorkspaceState>): Partial<WorkspaceState> {
+function migrateFromV2(
+  state: Partial<WorkspaceState>,
+): Partial<WorkspaceState> {
   const now = Date.now();
   return {
     version: 3,
@@ -129,7 +138,9 @@ function migrateFromV2(state: Partial<WorkspaceState>): Partial<WorkspaceState> 
   };
 }
 
-function migrateLegacyWorkspace(legacy: LegacyWorkspace): Partial<WorkspaceState> {
+function migrateLegacyWorkspace(
+  legacy: LegacyWorkspace,
+): Partial<WorkspaceState> {
   if (!Array.isArray(legacy.spaces) || legacy.spaces.length === 0) {
     return createInitialWorkspace();
   }
@@ -209,8 +220,8 @@ function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceState {
   const canvasIds = new Set(canvases.map((canvas) => canvas.id));
   const activeCanvasId = canvasIds.has(state.activeCanvasId ?? "")
     ? state.activeCanvasId!
-    : canvases.find((canvas) => canvas.parentId === null)?.id ??
-      canvases[0].id;
+    : (canvases.find((canvas) => canvas.parentId === null)?.id ??
+      canvases[0].id);
 
   const cameras = { ...(state.cameras ?? {}) };
   for (const canvas of canvases) {
@@ -271,7 +282,11 @@ function normalizeItem(
     y: typeof item.y === "number" ? item.y : 120,
     width: typeof item.width === "number" ? item.width : defaultWidth(kind),
     height: typeof item.height === "number" ? item.height : defaultHeight(kind),
-    color: isItemColor(item.color) ? item.color : kind === "note" ? "yellow" : "white",
+    color: isItemColor(item.color)
+      ? item.color
+      : kind === "note"
+        ? "yellow"
+        : "white",
     createdAt: item.createdAt ?? now,
     updatedAt: item.updatedAt ?? now,
   };

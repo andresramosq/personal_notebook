@@ -150,6 +150,23 @@ export function WorkspaceApp() {
             placeholder="Buscar en este lienzo"
           />
         </label>
+        <div
+          className={`database-status is-${workspace.persistenceStatus}`}
+          title={
+            workspace.persistenceStatus === "error"
+              ? "La base de datos no respondió. Se conservó una copia local."
+              : "Persistencia SQLite"
+          }
+        >
+          <span />
+          {workspace.persistenceStatus === "loading"
+            ? "Conectando"
+            : workspace.persistenceStatus === "saving"
+              ? "Guardando"
+              : workspace.persistenceStatus === "error"
+                ? "Copia local"
+                : "Guardado"}
+        </div>
       </header>
 
       <section className="system-content">

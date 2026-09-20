@@ -320,6 +320,31 @@ button {
   font-size: 12px;
 }
 
+.database-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.database-status span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #5aa66a;
+}
+
+.database-status.is-loading span,
+.database-status.is-saving span {
+  background: #d59a3a;
+}
+
+.database-status.is-error span {
+  background: var(--danger);
+}
+
 .system-content {
   position: relative;
   grid-area: content;

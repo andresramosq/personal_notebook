@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createId } from "@/lib/workspace/id";
 import {
   createInitialWorkspace,
+  hasLocalWorkspace,
   loadWorkspace,
   saveWorkspace,
 } from "@/lib/workspace/storage";
@@ -16,21 +17,76 @@ import type {
 
 export function useWorkspace() {
   const [state, setState] = useState<WorkspaceState | null>(null);
+  const [persistenceStatus, setPersistenceStatus] = useState<
+    "loading" | "saving" | "saved" | "error"
+  >("loading");
+  const hydratedRef = useRef(false);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- client bootstrap
-    setState(loadWorkspace());
+    let cancelled = false;
+
+    const restoreWorkspace = async () => {
+      try {
+        const response = await fetch("/api/workspace", { cache: "no-store" });
+        if (!response.ok) throw new Error("Database unavailable");
+        const result = (await response.json()) as {
+          state: WorkspaceState;
+          isNew: boolean;
+        };
+        const nextState =
+          result.isNew && hasLocalWorkspace() ? loadWorkspace() : result.state;
+
+        if (!cancelled) {
+          hydratedRef.current = true;
+          setState(nextState);
+          setPersistenceStatus("saved");
+        }
+      } catch {
+        if (!cancelled) {
+          hydratedRef.current = true;
+          setState(loadWorkspace());
+          setPersistenceStatus("error");
+        }
+      }
+    };
+
+    void restoreWorkspace();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (state) {
-      saveWorkspace(state);
-    }
+    if (!state || !hydratedRef.current) return;
+
+    saveWorkspace(state);
+    setPersistenceStatus("saving");
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/workspace", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(state),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Database save failed");
+        setPersistenceStatus("saved");
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setPersistenceStatus("error");
+        }
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, [state]);
 
   const activeCanvas = useMemo(
-    () =>
-      state?.canvases.find((canvas) => canvas.id === state.activeCanvasId),
+    () => state?.canvases.find((canvas) => canvas.id === state.activeCanvasId),
     [state],
   );
 
@@ -141,8 +197,9 @@ export function useWorkspace() {
 
       return {
         ...current,
-        activeCanvasId:
-          nestedIds.has(current.activeCanvasId) ? canvases[0].id : current.activeCanvasId,
+        activeCanvasId: nestedIds.has(current.activeCanvasId)
+          ? canvases[0].id
+          : current.activeCanvasId,
         canvases,
         items: current.items.filter((item) => !nestedIds.has(item.canvasId)),
         links: current.links.filter((link) => !nestedIds.has(link.canvasId)),
@@ -237,7 +294,7 @@ export function useWorkspace() {
       return {
         ...current,
         activeCanvasId: nestedIds.has(current.activeCanvasId)
-          ? item?.canvasId ?? canvases[0].id
+          ? (item?.canvasId ?? canvases[0].id)
           : current.activeCanvasId,
         canvases,
         cameras,
@@ -331,6 +388,7 @@ export function useWorkspace() {
     updateCamera,
     getNestedPreview,
     resetWorkspace,
+    persistenceStatus,
   };
 }
 

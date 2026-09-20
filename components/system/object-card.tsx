@@ -187,7 +187,10 @@ export const ObjectCard = memo(function ObjectCard({
             <div className="board-preview">
               {nestedPreview.length ? (
                 nestedPreview.map((preview) => (
-                  <div key={preview.id} className={`preview-chip color-${preview.color}`}>
+                  <div
+                    key={preview.id}
+                    className={`preview-chip color-${preview.color}`}
+                  >
                     {preview.title || preview.content || "Elemento"}
                   </div>
                 ))
