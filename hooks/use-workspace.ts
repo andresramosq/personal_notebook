@@ -7,6 +7,8 @@ import {
   saveWorkspace,
 } from "@/lib/workspace/storage";
 import type {
+  DrawingPoint,
+  ObjectKind,
   WorkspaceLink,
   WorkspaceObject,
   WorkspaceState,
@@ -108,7 +110,12 @@ export function useWorkspace() {
     });
   };
 
-  const createObject = (position?: { x: number; y: number }) => {
+  const createObject = (
+    position?: { x: number; y: number },
+    kind: ObjectKind = "card",
+    size?: { width: number; height: number },
+    points: DrawingPoint[] = [],
+  ) => {
     if (!state) {
       return "";
     }
@@ -116,17 +123,80 @@ export function useWorkspace() {
     const id = crypto.randomUUID();
     const now = Date.now();
     const index = objects.length;
+    const defaults: Record<
+      ObjectKind,
+      Pick<WorkspaceObject, "title" | "description" | "color" | "width" | "height">
+    > = {
+      card: {
+        title: "Nuevo objeto",
+        description: "",
+        color: "#ffffff",
+        width: 280,
+        height: 180,
+      },
+      note: {
+        title: "Nueva nota",
+        description: "Escribe aquí…",
+        color: "#fff3bf",
+        width: 240,
+        height: 210,
+      },
+      text: {
+        title: "Texto",
+        description: "",
+        color: "transparent",
+        width: 240,
+        height: 80,
+      },
+      rectangle: {
+        title: "",
+        description: "",
+        color: "#dbeafe",
+        width: 220,
+        height: 140,
+      },
+      ellipse: {
+        title: "",
+        description: "",
+        color: "#f3e8ff",
+        width: 180,
+        height: 140,
+      },
+      page: {
+        title: "Nueva página",
+        description: "Documento vacío",
+        color: "#ffffff",
+        width: 300,
+        height: 220,
+      },
+      database: {
+        title: "Base de datos",
+        description: "",
+        color: "#ffffff",
+        width: 420,
+        height: 260,
+      },
+      drawing: {
+        title: "",
+        description: "",
+        color: "transparent",
+        width: 1,
+        height: 1,
+      },
+    };
+    const preset = defaults[kind];
     const object: WorkspaceObject = {
       id,
       spaceId: state.activeSpaceId,
-      title: "Nuevo objeto",
-      description: "",
+      kind,
+      title: preset.title,
+      description: preset.description,
       status: "inbox",
       x: position?.x ?? 160 + (index % 5) * 32,
       y: position?.y ?? 120 + (index % 5) * 32,
-      width: 280,
-      height: 180,
-      color: "#ffffff",
+      width: size?.width ?? preset.width,
+      height: size?.height ?? preset.height,
+      color: preset.color,
       startDate: "",
       endDate: "",
       reminder: "",
@@ -134,6 +204,20 @@ export function useWorkspace() {
       person: "",
       tags: [],
       properties: [],
+      points,
+      databaseRows:
+        kind === "database"
+          ? [
+              {
+                id: crypto.randomUUID(),
+                title: "Primer registro",
+                status: "inbox",
+                value: "",
+              },
+            ]
+          : [],
+      strokeColor: "#292929",
+      strokeWidth: 2,
       createdAt: now,
       updatedAt: now,
     };

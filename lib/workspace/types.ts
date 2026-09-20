@@ -1,5 +1,37 @@
 export type WorkspaceView = "canvas" | "records";
 export type ObjectStatus = "inbox" | "active" | "waiting" | "done";
+export type CanvasTool =
+  | "select"
+  | "hand"
+  | "draw"
+  | "rectangle"
+  | "ellipse"
+  | "text"
+  | "note"
+  | "page"
+  | "database"
+  | "connect";
+export type ObjectKind =
+  | "card"
+  | "note"
+  | "text"
+  | "rectangle"
+  | "ellipse"
+  | "page"
+  | "database"
+  | "drawing";
+
+export type DrawingPoint = {
+  x: number;
+  y: number;
+};
+
+export type DatabaseRow = {
+  id: string;
+  title: string;
+  status: ObjectStatus;
+  value: string;
+};
 
 export type WorkspaceSpace = {
   id: string;
@@ -17,6 +49,7 @@ export type CustomProperty = {
 export type WorkspaceObject = {
   id: string;
   spaceId: string;
+  kind: ObjectKind;
   title: string;
   description: string;
   status: ObjectStatus;
@@ -32,6 +65,10 @@ export type WorkspaceObject = {
   person: string;
   tags: string[];
   properties: CustomProperty[];
+  points: DrawingPoint[];
+  databaseRows: DatabaseRow[];
+  strokeColor: string;
+  strokeWidth: number;
   createdAt: number;
   updatedAt: number;
 };

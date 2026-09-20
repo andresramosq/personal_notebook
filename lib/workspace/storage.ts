@@ -41,7 +41,17 @@ export function loadWorkspace(): WorkspaceState {
       return createInitialWorkspace();
     }
 
-    return state;
+    return {
+      ...state,
+      objects: state.objects.map((object) => ({
+        ...object,
+        kind: object.kind ?? "card",
+        points: object.points ?? [],
+        databaseRows: object.databaseRows ?? [],
+        strokeColor: object.strokeColor ?? "#292929",
+        strokeWidth: object.strokeWidth ?? 2,
+      })),
+    };
   } catch {
     return createInitialWorkspace();
   }

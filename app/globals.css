@@ -337,6 +337,32 @@ button {
   pointer-events: auto;
 }
 
+.object-ellipse {
+  border-radius: 999px;
+}
+
+.object-text {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.object-text > header {
+  opacity: 0;
+}
+
+.object-text:hover > header,
+.object-text.is-selected > header {
+  opacity: 1;
+}
+
+.object-page {
+  box-shadow: 0 12px 35px rgb(25 25 25 / 10%);
+}
+
+.object-database {
+  border-radius: 8px;
+}
+
 .object-card.is-selected {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -385,6 +411,10 @@ button {
 }
 
 .object-card-body {
+  display: flex;
+  min-height: 0;
+  height: calc(100% - 32px);
+  flex-direction: column;
   padding: 16px;
 }
 
@@ -395,6 +425,165 @@ button {
 
 .object-card h3 {
   font-size: 16px;
+}
+
+.object-title-input,
+.object-description-input,
+.shape-label {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+
+.object-title-input {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.object-text .object-title-input {
+  font-size: 22px;
+}
+
+.object-description-input {
+  min-height: 60px;
+  flex: 1;
+  margin-top: 10px;
+  resize: none;
+  color: #5f5f5b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.shape-label {
+  height: 100%;
+  text-align: center;
+  font-weight: 650;
+}
+
+.resize-handle {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+  border: 0;
+  border-right: 2px solid rgb(70 70 80 / 45%);
+  border-bottom: 2px solid rgb(70 70 80 / 45%);
+  background: transparent;
+}
+
+.mini-database {
+  display: flex;
+  margin-top: 12px;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: auto;
+}
+
+.mini-database > div {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mini-database input {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid var(--line);
+  padding: 8px;
+  outline: none;
+}
+
+.mini-database span {
+  padding: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.mini-database button {
+  border: 0;
+  background: #fafaf8;
+  padding: 8px;
+  color: var(--muted);
+  text-align: left;
+  font-size: 11px;
+}
+
+.drawing-object,
+.drawing-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.drawing-preview path {
+  fill: none;
+  stroke: #292929;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shape-draft {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 2px dashed var(--accent);
+  background: rgb(91 91 214 / 10%);
+  pointer-events: none;
+}
+
+.shape-draft.object-ellipse {
+  border-radius: 999px;
+}
+
+.creative-toolbar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  transform: translateX(-50%);
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 96%);
+  padding: 5px;
+  box-shadow: 0 8px 26px rgb(0 0 0 / 10%);
+}
+
+.creative-toolbar button {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 17px;
+}
+
+.creative-toolbar button:hover {
+  background: #f0f0ed;
+}
+
+.creative-toolbar button.is-active {
+  background: #e9e9ff;
+  color: var(--accent);
+}
+
+.creative-toolbar small {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  color: #9a9a96;
+  font-size: 7px;
 }
 
 .object-card p {

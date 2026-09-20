@@ -1,16 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
 import { ObjectInspector } from "@/components/system/object-inspector";
 import { RecordsView } from "@/components/system/records-view";
 import { WorkspaceSidebar } from "@/components/system/workspace-sidebar";
 import { useWorkspace } from "@/hooks/use-workspace";
+import type {
+  CanvasTool,
+  DrawingPoint,
+  ObjectKind,
+} from "@/lib/workspace/types";
 
 export function WorkspaceApp() {
   const workspace = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<CanvasTool>("select");
   const [query, setQuery] = useState("");
 
   const selected = workspace.objects.find(
@@ -34,12 +40,44 @@ export function WorkspaceApp() {
     );
   }, [query, workspace.objects]);
 
+  useEffect(() => {
+    const shortcuts: Record<string, CanvasTool> = {
+      v: "select",
+      h: "hand",
+      d: "draw",
+      r: "rectangle",
+      o: "ellipse",
+      t: "text",
+      n: "note",
+      p: "page",
+      b: "database",
+      c: "connect",
+    };
+    const handler = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement
+      )
+        return;
+      const tool = shortcuts[event.key.toLowerCase()];
+      if (tool) setActiveTool(tool);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   if (!workspace.state || !workspace.activeSpace) {
     return <main className="system-loading">Preparando tu espacio…</main>;
   }
 
-  const createObject = (position?: { x: number; y: number }) => {
-    const id = workspace.createObject(position);
+  const createObject = (
+    position?: { x: number; y: number },
+    kind: ObjectKind = "card",
+    size?: { width: number; height: number },
+    points?: DrawingPoint[],
+  ) => {
+    const id = workspace.createObject(position, kind, size, points);
     setSelectedId(id);
   };
 
@@ -105,21 +143,22 @@ export function WorkspaceApp() {
         <button
           type="button"
           className="header-action"
-          onClick={() => createObject()}
+          onClick={() => createObject(undefined, "card")}
         >
           + Objeto
         </button>
         <button
           type="button"
           className={`header-action secondary ${
-            linkSourceId ? "is-active" : ""
+            activeTool === "connect" ? "is-active" : ""
           }`}
           disabled={!selectedId}
-          onClick={() =>
-            setLinkSourceId((current) => (current ? null : selectedId))
-          }
+          onClick={() => {
+            setLinkSourceId(selectedId);
+            setActiveTool("connect");
+          }}
         >
-          {linkSourceId ? "Cancelar" : "Conectar"}
+          Conectar
         </button>
       </header>
 
@@ -131,26 +170,43 @@ export function WorkspaceApp() {
             objects={visibleObjects}
             links={workspace.links}
             selectedId={selectedId}
-            linkSourceId={linkSourceId}
+            activeTool={activeTool}
+            onToolChange={(tool) => {
+              setActiveTool(tool);
+              if (tool !== "connect") setLinkSourceId(null);
+              if (tool === "connect" && selectedId)
+                setLinkSourceId(selectedId);
+            }}
             onSelect={setSelectedId}
             onMove={(id, x, y) => workspace.updateObject(id, { x, y })}
+            onResize={(id, width, height) =>
+              workspace.updateObject(id, { width, height })
+            }
+            onUpdate={workspace.updateObject}
             onCreate={createObject}
             onLinkObject={(targetId) => {
-              if (linkSourceId && targetId !== linkSourceId) {
+              if (!linkSourceId) {
+                setLinkSourceId(targetId);
+                setSelectedId(targetId);
+              } else if (targetId !== linkSourceId) {
                 workspace.createLink(linkSourceId, targetId);
                 setLinkSourceId(null);
                 setSelectedId(targetId);
+                setActiveTool("select");
               }
             }}
             onDeleteLink={workspace.deleteLink}
           />
         ) : (
           <RecordsView
-            objects={visibleObjects}
+            objects={visibleObjects.filter(
+              (object) =>
+                !["drawing", "rectangle", "ellipse"].includes(object.kind),
+            )}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onUpdate={workspace.updateObject}
-            onCreate={() => createObject()}
+            onCreate={() => createObject(undefined, "card")}
           />
         )}
 
