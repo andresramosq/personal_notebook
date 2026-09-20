@@ -1,11 +1,12 @@
 type IconName =
   | "board"
-  | "check"
   | "chevron"
   | "close"
   | "copy"
-  | "download"
   | "hand"
+  | "image"
+  | "line"
+  | "link"
   | "menu"
   | "more"
   | "note"
@@ -27,7 +28,6 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M9 3v18M9 10h12" />
     </>
   ),
-  check: <path d="m5 12 4 4L19 6" />,
   chevron: <path d="m9 18 6-6-6-6" />,
   close: <path d="M18 6 6 18M6 6l12 12" />,
   copy: (
@@ -36,14 +36,22 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
     </>
   ),
-  download: (
-    <>
-      <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
-      <path d="M5 21h14" />
-    </>
-  ),
   hand: (
     <path d="M7 11V7a2 2 0 0 1 4 0v3-5a2 2 0 0 1 4 0v5-2a2 2 0 0 1 4 0v6a7 7 0 0 1-7 7h-1a7 7 0 0 1-6-3.5L3.4 15A2 2 0 0 1 7 13.2" />
+  ),
+  image: (
+    <>
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m4 16 5-5 4 4 3-3 4 4" />
+    </>
+  ),
+  line: <path d="m5 19 7-7 4 4 6-6" />,
+  link: (
+    <>
+      <path d="M10 13a3 3 0 0 1 0-4l2-2a3 3 0 0 1 4 4l-1 1" />
+      <path d="M14 11a3 3 0 0 1 0 4l-2 2a3 3 0 0 1-4-4l1-1" />
+    </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   more: (

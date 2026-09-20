@@ -18,8 +18,7 @@ export function useWorkspace() {
   const [state, setState] = useState<WorkspaceState | null>(null);
 
   useEffect(() => {
-    // Client-only restore from localStorage after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional one-time bootstrap
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client bootstrap
     setState(loadWorkspace());
   }, []);
 
@@ -30,7 +29,13 @@ export function useWorkspace() {
   }, [state]);
 
   const activeCanvas = useMemo(
-    () => state?.canvases.find((canvas) => canvas.id === state.activeCanvasId),
+    () =>
+      state?.canvases.find((canvas) => canvas.id === state.activeCanvasId),
+    [state],
+  );
+
+  const rootCanvases = useMemo(
+    () => state?.canvases.filter((canvas) => canvas.parentId === null) ?? [],
     [state],
   );
 
@@ -41,6 +46,21 @@ export function useWorkspace() {
     [state],
   );
 
+  const links = useMemo(
+    () =>
+      state?.links.filter((link) => link.canvasId === state.activeCanvasId) ??
+      [],
+    [state],
+  );
+
+  const parentCanvas = useMemo(
+    () =>
+      activeCanvas?.parentId
+        ? state?.canvases.find((canvas) => canvas.id === activeCanvas.parentId)
+        : undefined,
+    [activeCanvas, state],
+  );
+
   const update = (recipe: (current: WorkspaceState) => WorkspaceState) => {
     setState((current) => (current ? recipe(current) : current));
   };
@@ -48,25 +68,40 @@ export function useWorkspace() {
   const createCanvas = () => {
     const id = createId();
     const now = Date.now();
-    update((current) => ({
-      ...current,
-      activeCanvasId: id,
-      canvases: [
-        ...current.canvases,
-        {
-          id,
-          name: `Lienzo ${current.canvases.length + 1}`,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ],
-      cameras: { ...current.cameras, [id]: { x: 0, y: 0, zoom: 1 } },
-    }));
+    update((current) => {
+      const rootCount = current.canvases.filter(
+        (canvas) => canvas.parentId === null,
+      ).length;
+      return {
+        ...current,
+        activeCanvasId: id,
+        canvases: [
+          ...current.canvases,
+          {
+            id,
+            name: `Espacio ${rootCount + 1}`,
+            parentId: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        cameras: { ...current.cameras, [id]: { x: 0, y: 0, zoom: 1 } },
+      };
+    });
     return id;
   };
 
   const setActiveCanvas = (id: string) => {
     update((current) => ({ ...current, activeCanvasId: id }));
+  };
+
+  const enterCanvas = (id: string) => {
+    update((current) => ({ ...current, activeCanvasId: id }));
+  };
+
+  const goToParentCanvas = () => {
+    if (!activeCanvas?.parentId) return;
+    setActiveCanvas(activeCanvas.parentId);
   };
 
   const renameCanvas = (name: string) => {
@@ -80,129 +115,90 @@ export function useWorkspace() {
     }));
   };
 
-  const duplicateCanvas = (id: string) => {
-    if (!state) return;
-    const source = state.canvases.find((canvas) => canvas.id === id);
-    if (!source) return;
-
-    const newId = createId();
-    const now = Date.now();
-    const copiedItems = state.items
-      .filter((item) => item.canvasId === id)
-      .map((item) => ({
-        ...item,
-        id: createId(),
-        canvasId: newId,
-        createdAt: now,
-        updatedAt: now,
-        checklist: item.checklist.map((entry) => ({
-          ...entry,
-          id: createId(),
-        })),
-      }));
-
-    update((current) => ({
-      ...current,
-      activeCanvasId: newId,
-      canvases: [
-        ...current.canvases,
-        {
-          ...source,
-          id: newId,
-          name: `${source.name} (copia)`,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ],
-      items: [...current.items, ...copiedItems],
-      cameras: {
-        ...current.cameras,
-        [newId]: current.cameras[id] ?? { x: 0, y: 0, zoom: 1 },
-      },
-    }));
-  };
-
   const deleteCanvas = (id: string) => {
     update((current) => {
-      if (current.canvases.length === 1) {
+      const rootCount = current.canvases.filter(
+        (canvas) => canvas.parentId === null,
+      ).length;
+      if (rootCount <= 1) {
         return current;
       }
 
-      const canvases = current.canvases.filter((canvas) => canvas.id !== id);
+      const nestedIds = new Set<string>();
+      const collectNested = (canvasId: string) => {
+        nestedIds.add(canvasId);
+        current.canvases
+          .filter((canvas) => canvas.parentId === canvasId)
+          .forEach((canvas) => collectNested(canvas.id));
+      };
+      collectNested(id);
+
+      const canvases = current.canvases.filter(
+        (canvas) => !nestedIds.has(canvas.id),
+      );
       const cameras = { ...current.cameras };
-      delete cameras[id];
+      nestedIds.forEach((canvasId) => delete cameras[canvasId]);
 
       return {
         ...current,
         activeCanvasId:
-          current.activeCanvasId === id
-            ? canvases[0].id
-            : current.activeCanvasId,
+          nestedIds.has(current.activeCanvasId) ? canvases[0].id : current.activeCanvasId,
         canvases,
-        items: current.items.filter((item) => item.canvasId !== id),
+        items: current.items.filter((item) => !nestedIds.has(item.canvasId)),
+        links: current.links.filter((link) => !nestedIds.has(link.canvasId)),
         cameras,
       };
     });
   };
 
   const createItem = (kind: ItemKind, position: { x: number; y: number }) => {
-    if (!state) {
-      return "";
-    }
+    if (!state) return "";
 
     const id = createId();
     const now = Date.now();
-    const defaults: Record<
-      ItemKind,
-      Pick<
-        CanvasItem,
-        "title" | "content" | "width" | "height" | "color" | "checklist"
-      >
-    > = {
-      note: {
-        title: "Nueva nota",
-        content: "",
-        width: 280,
-        height: 190,
-        color: "white",
-        checklist: [],
-      },
-      text: {
-        title: "",
-        content: "Escribe un texto",
-        width: 300,
-        height: 90,
-        color: "white",
-        checklist: [],
-      },
-      checklist: {
-        title: "Nueva lista",
-        content: "",
-        width: 300,
-        height: 220,
-        color: "white",
-        checklist: [{ id: createId(), text: "", checked: false }],
-      },
-    };
-    const preset = defaults[kind];
+    let nestedCanvasId: string | null = null;
+    let extraCanvases = state.canvases;
+    let extraCameras = state.cameras;
+
+    if (kind === "board") {
+      nestedCanvasId = createId();
+      extraCanvases = [
+        ...extraCanvases,
+        {
+          id: nestedCanvasId,
+          name: "Pizarra anidada",
+          parentId: state.activeCanvasId,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ];
+      extraCameras = {
+        ...extraCameras,
+        [nestedCanvasId]: { x: 0, y: 0, zoom: 1 },
+      };
+    }
+
     const item: CanvasItem = {
       id,
       canvasId: state.activeCanvasId,
       kind,
-      title: preset.title,
-      content: preset.content,
-      checklist: preset.checklist,
+      title: defaultItemTitle(kind),
+      content: kind === "text" ? "Escribe un texto" : "",
+      url: kind === "link" ? "https://" : "",
+      nestedCanvasId,
       x: position.x,
       y: position.y,
-      width: preset.width,
-      height: preset.height,
-      color: preset.color,
+      width: defaultItemWidth(kind),
+      height: defaultItemHeight(kind),
+      color: kind === "note" ? "yellow" : "white",
       createdAt: now,
       updatedAt: now,
     };
 
     update((current) => ({
       ...current,
+      canvases: kind === "board" ? extraCanvases : current.canvases,
+      cameras: kind === "board" ? extraCameras : current.cameras,
       items: [...current.items, item],
     }));
 
@@ -219,36 +215,75 @@ export function useWorkspace() {
   };
 
   const deleteItem = (id: string) => {
-    update((current) => ({
-      ...current,
-      items: current.items.filter((item) => item.id !== id),
-    }));
+    update((current) => {
+      const item = current.items.find((candidate) => candidate.id === id);
+      const nestedIds = new Set<string>();
+      if (item?.kind === "board" && item.nestedCanvasId) {
+        const collectNested = (canvasId: string) => {
+          nestedIds.add(canvasId);
+          current.canvases
+            .filter((canvas) => canvas.parentId === canvasId)
+            .forEach((canvas) => collectNested(canvas.id));
+        };
+        collectNested(item.nestedCanvasId);
+      }
+
+      const canvases = current.canvases.filter(
+        (canvas) => !nestedIds.has(canvas.id),
+      );
+      const cameras = { ...current.cameras };
+      nestedIds.forEach((canvasId) => delete cameras[canvasId]);
+
+      return {
+        ...current,
+        activeCanvasId: nestedIds.has(current.activeCanvasId)
+          ? item?.canvasId ?? canvases[0].id
+          : current.activeCanvasId,
+        canvases,
+        cameras,
+        items: current.items.filter(
+          (candidate) =>
+            candidate.id !== id && !nestedIds.has(candidate.canvasId),
+        ),
+        links: current.links.filter(
+          (link) =>
+            link.fromId !== id &&
+            link.toId !== id &&
+            !nestedIds.has(link.canvasId),
+        ),
+      };
+    });
   };
 
-  const duplicateItem = (id: string) => {
-    const item = state?.items.find((candidate) => candidate.id === id);
-    if (!item) return "";
-    const newId = createId();
-    const now = Date.now();
+  const createLink = (fromId: string, toId: string) => {
+    if (!state || fromId === toId) return;
+    const exists = state.links.some(
+      (link) =>
+        link.canvasId === state.activeCanvasId &&
+        ((link.fromId === fromId && link.toId === toId) ||
+          (link.fromId === toId && link.toId === fromId)),
+    );
+    if (exists) return;
+
     update((current) => ({
       ...current,
-      items: [
-        ...current.items,
+      links: [
+        ...current.links,
         {
-          ...item,
-          id: newId,
-          x: item.x + 28,
-          y: item.y + 28,
-          checklist: item.checklist.map((entry) => ({
-            ...entry,
-            id: createId(),
-          })),
-          createdAt: now,
-          updatedAt: now,
+          id: createId(),
+          canvasId: current.activeCanvasId,
+          fromId,
+          toId,
         },
       ],
     }));
-    return newId;
+  };
+
+  const deleteLink = (linkId: string) => {
+    update((current) => ({
+      ...current,
+      links: current.links.filter((link) => link.id !== linkId),
+    }));
   };
 
   const updateCamera = (camera: CanvasCamera) => {
@@ -261,38 +296,64 @@ export function useWorkspace() {
     }));
   };
 
+  const getNestedPreview = useCallback(
+    (canvasId: string) => {
+      if (!state) return [];
+      return state.items
+        .filter((item) => item.canvasId === canvasId)
+        .slice(0, 4);
+    },
+    [state],
+  );
+
   const resetWorkspace = useCallback(() => {
     setState(createInitialWorkspace());
   }, []);
 
-  const exportWorkspace = () => {
-    if (!state) return;
-    const blob = new Blob([JSON.stringify(state, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `libreta-${new Date().toISOString().slice(0, 10)}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
   return {
     state,
     activeCanvas,
+    parentCanvas,
+    rootCanvases,
     items,
+    links,
     createCanvas,
     setActiveCanvas,
+    enterCanvas,
+    goToParentCanvas,
     renameCanvas,
-    duplicateCanvas,
     deleteCanvas,
     createItem,
     updateItem,
-    duplicateItem,
     deleteItem,
+    createLink,
+    deleteLink,
     updateCamera,
-    exportWorkspace,
+    getNestedPreview,
     resetWorkspace,
   };
+}
+
+function defaultItemTitle(kind: ItemKind) {
+  if (kind === "board") return "Pizarra anidada";
+  if (kind === "link") return "Enlace";
+  if (kind === "image") return "Imagen";
+  if (kind === "text") return "";
+  return "Nueva nota";
+}
+
+function defaultItemWidth(kind: ItemKind) {
+  if (kind === "text") return 280;
+  if (kind === "board") return 260;
+  if (kind === "link") return 240;
+  if (kind === "image") return 220;
+  return 280;
+}
+
+function defaultItemHeight(kind: ItemKind) {
+  if (kind === "text") return 90;
+  if (kind === "board") return 180;
+  if (kind === "link") return 110;
+  if (kind === "image") return 160;
+  return 200;
 }

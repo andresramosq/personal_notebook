@@ -15,17 +15,19 @@ export function createInitialWorkspace(): WorkspaceState {
   const canvasId = createId();
 
   return {
-    version: 2,
+    version: 3,
     activeCanvasId: canvasId,
     canvases: [
       {
         id: canvasId,
-        name: "Mi primer lienzo",
+        name: "Proyecto Libreta",
+        parentId: null,
         createdAt: now,
         updatedAt: now,
       },
     ],
     items: [],
+    links: [],
     cameras: {
       [canvasId]: DEFAULT_CAMERA,
     },
@@ -39,20 +41,25 @@ export function loadWorkspace(): WorkspaceState {
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-
     if (!raw) {
       return createInitialWorkspace();
     }
 
     const parsed = JSON.parse(raw) as Partial<WorkspaceState> & LegacyWorkspace;
-    const state =
-      parsed.version === 2
-        ? parsed
-        : parsed.version === 1 || parsed.spaces
-          ? migrateLegacyWorkspace(parsed)
-          : createInitialWorkspace();
 
-    return normalizeWorkspace(state);
+    if (parsed.version === 3) {
+      return normalizeWorkspace(parsed);
+    }
+
+    if (parsed.version === 2) {
+      return normalizeWorkspace(migrateFromV2(parsed));
+    }
+
+    if (parsed.version === 1 || parsed.spaces) {
+      return normalizeWorkspace(migrateLegacyWorkspace(parsed));
+    }
+
+    return createInitialWorkspace();
   } catch {
     return createInitialWorkspace();
   }
@@ -91,7 +98,38 @@ type LegacyWorkspace = {
   }>;
 };
 
-function migrateLegacyWorkspace(legacy: LegacyWorkspace): WorkspaceState {
+function migrateFromV2(state: Partial<WorkspaceState>): Partial<WorkspaceState> {
+  const now = Date.now();
+  return {
+    version: 3,
+    activeCanvasId: state.activeCanvasId,
+    canvases: (state.canvases ?? []).map((canvas) => ({
+      ...canvas,
+      parentId: canvas.parentId ?? null,
+      updatedAt: canvas.updatedAt ?? now,
+    })),
+    items: (state.items ?? []).map((item) => ({
+      id: item.id,
+      canvasId: item.canvasId,
+      kind: migrateKind(item.kind),
+      title: item.title ?? "",
+      content: item.content ?? "",
+      url: item.url ?? "",
+      nestedCanvasId: item.nestedCanvasId ?? null,
+      x: item.x ?? 120,
+      y: item.y ?? 120,
+      width: item.width ?? 280,
+      height: item.height ?? 190,
+      color: item.color ?? "white",
+      createdAt: item.createdAt ?? now,
+      updatedAt: item.updatedAt ?? now,
+    })),
+    links: state.links ?? [],
+    cameras: state.cameras ?? {},
+  };
+}
+
+function migrateLegacyWorkspace(legacy: LegacyWorkspace): Partial<WorkspaceState> {
   if (!Array.isArray(legacy.spaces) || legacy.spaces.length === 0) {
     return createInitialWorkspace();
   }
@@ -100,67 +138,59 @@ function migrateLegacyWorkspace(legacy: LegacyWorkspace): WorkspaceState {
   const canvases: WorkspaceCanvas[] = legacy.spaces.map((space) => ({
     id: space.id,
     name: space.name || "Lienzo sin título",
+    parentId: null,
     createdAt: space.createdAt ?? now,
     updatedAt: now,
   }));
   const canvasIds = new Set(canvases.map((canvas) => canvas.id));
   const items = (legacy.objects ?? [])
     .filter((object) => canvasIds.has(object.spaceId))
-    .map((object): CanvasItem => {
-      const kind: ItemKind =
-        object.kind === "text"
-          ? "text"
-          : object.kind === "database"
-            ? "checklist"
-            : "note";
-      const checklist =
-        kind === "checklist"
-          ? (object.databaseRows ?? []).map((row) => ({
-              id: row.id || createId(),
-              text: row.title ?? "",
-              checked: row.status === "done",
-            }))
-          : [];
-
-      return {
-        id: object.id || createId(),
-        canvasId: object.spaceId,
-        kind,
-        title: object.title ?? "",
-        content: object.description ?? "",
-        checklist,
-        x: object.x ?? 120,
-        y: object.y ?? 120,
-        width: object.width ?? (kind === "text" ? 260 : 280),
-        height: object.height ?? (kind === "text" ? 90 : 190),
-        color: migrateColor(object.color),
-        createdAt: object.createdAt ?? now,
-        updatedAt: object.updatedAt ?? now,
-      };
-    });
+    .map((object): CanvasItem => ({
+      id: object.id || createId(),
+      canvasId: object.spaceId,
+      kind: object.kind === "text" ? "text" : "note",
+      title: object.title ?? "",
+      content: object.description ?? "",
+      url: "",
+      nestedCanvasId: null,
+      x: object.x ?? 120,
+      y: object.y ?? 120,
+      width: object.width ?? (object.kind === "text" ? 260 : 280),
+      height: object.height ?? (object.kind === "text" ? 90 : 190),
+      color: migrateColor(object.color),
+      createdAt: object.createdAt ?? now,
+      updatedAt: object.updatedAt ?? now,
+    }));
 
   const preferredId = legacy.activeCanvasId ?? legacy.activeSpaceId;
   const activeCanvasId = canvasIds.has(preferredId ?? "")
     ? preferredId!
     : canvases[0].id;
 
-  return normalizeWorkspace({
-    version: 2,
+  return {
+    version: 3,
     canvases,
     items,
+    links: [],
     cameras: Object.fromEntries(
       canvases.map((canvas) => [canvas.id, DEFAULT_CAMERA]),
     ),
     activeCanvasId,
-  });
+  };
 }
 
-function normalizeWorkspace(
-  state: Partial<WorkspaceState>,
-): WorkspaceState {
+function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceState {
   const now = Date.now();
   let canvases = Array.isArray(state.canvases)
-    ? state.canvases.filter((canvas) => canvas?.id)
+    ? state.canvases
+        .filter((canvas) => canvas?.id)
+        .map((canvas) => ({
+          id: canvas.id,
+          name: canvas.name || "Sin título",
+          parentId: canvas.parentId ?? null,
+          createdAt: canvas.createdAt ?? now,
+          updatedAt: canvas.updatedAt ?? now,
+        }))
     : [];
 
   if (!canvases.length) {
@@ -168,7 +198,8 @@ function normalizeWorkspace(
     canvases = [
       {
         id: canvasId,
-        name: "Mi primer lienzo",
+        name: "Proyecto Libreta",
+        parentId: null,
         createdAt: now,
         updatedAt: now,
       },
@@ -178,7 +209,8 @@ function normalizeWorkspace(
   const canvasIds = new Set(canvases.map((canvas) => canvas.id));
   const activeCanvasId = canvasIds.has(state.activeCanvasId ?? "")
     ? state.activeCanvasId!
-    : canvases[0].id;
+    : canvases.find((canvas) => canvas.parentId === null)?.id ??
+      canvases[0].id;
 
   const cameras = { ...(state.cameras ?? {}) };
   for (const canvas of canvases) {
@@ -189,42 +221,92 @@ function normalizeWorkspace(
 
   const items = (Array.isArray(state.items) ? state.items : [])
     .filter((item) => canvasIds.has(item.canvasId))
-    .map((item) => normalizeItem(item, now));
+    .map((item) => normalizeItem(item, now, canvasIds));
+
+  const itemIds = new Set(items.map((item) => item.id));
+  const links = (Array.isArray(state.links) ? state.links : [])
+    .filter(
+      (link) =>
+        canvasIds.has(link.canvasId) &&
+        itemIds.has(link.fromId) &&
+        itemIds.has(link.toId),
+    )
+    .map((link) => ({
+      id: link.id || createId(),
+      canvasId: link.canvasId,
+      fromId: link.fromId,
+      toId: link.toId,
+    }));
 
   return {
-    version: 2,
+    version: 3,
     canvases,
     items,
+    links,
     cameras,
     activeCanvasId,
   };
 }
 
-function normalizeItem(item: Partial<CanvasItem>, now: number): CanvasItem {
-  const kind: ItemKind =
-    item.kind === "text" || item.kind === "checklist" ? item.kind : "note";
+function normalizeItem(
+  item: Partial<CanvasItem>,
+  now: number,
+  canvasIds: Set<string>,
+): CanvasItem {
+  const kind = migrateKind(item.kind);
+  let nestedCanvasId = item.nestedCanvasId ?? null;
+  if (kind === "board" && nestedCanvasId && !canvasIds.has(nestedCanvasId)) {
+    nestedCanvasId = null;
+  }
 
   return {
     id: item.id || createId(),
     canvasId: item.canvasId!,
     kind,
-    title: item.title ?? (kind === "note" ? "Nueva nota" : ""),
+    title: item.title ?? defaultTitle(kind),
     content: item.content ?? "",
-    checklist: Array.isArray(item.checklist)
-      ? item.checklist.map((entry) => ({
-          id: entry.id || createId(),
-          text: entry.text ?? "",
-          checked: Boolean(entry.checked),
-        }))
-      : [],
+    url: item.url ?? "",
+    nestedCanvasId,
     x: typeof item.x === "number" ? item.x : 120,
     y: typeof item.y === "number" ? item.y : 120,
-    width: typeof item.width === "number" ? item.width : 280,
-    height: typeof item.height === "number" ? item.height : 190,
-    color: isItemColor(item.color) ? item.color : "white",
+    width: typeof item.width === "number" ? item.width : defaultWidth(kind),
+    height: typeof item.height === "number" ? item.height : defaultHeight(kind),
+    color: isItemColor(item.color) ? item.color : kind === "note" ? "yellow" : "white",
     createdAt: item.createdAt ?? now,
     updatedAt: item.updatedAt ?? now,
   };
+}
+
+function migrateKind(kind?: string): ItemKind {
+  if (kind === "text") return "text";
+  if (kind === "board") return "board";
+  if (kind === "link") return "link";
+  if (kind === "image") return "image";
+  return "note";
+}
+
+function defaultTitle(kind: ItemKind) {
+  if (kind === "board") return "Pizarra anidada";
+  if (kind === "link") return "Enlace";
+  if (kind === "image") return "Imagen";
+  if (kind === "text") return "";
+  return "Nueva nota";
+}
+
+function defaultWidth(kind: ItemKind) {
+  if (kind === "text") return 280;
+  if (kind === "board") return 260;
+  if (kind === "link") return 240;
+  if (kind === "image") return 220;
+  return 280;
+}
+
+function defaultHeight(kind: ItemKind) {
+  if (kind === "text") return 90;
+  if (kind === "board") return 180;
+  if (kind === "link") return 110;
+  if (kind === "image") return 160;
+  return 200;
 }
 
 function migrateColor(value?: string): ItemColor {

@@ -1,16 +1,11 @@
-export type ItemKind = "note" | "text" | "checklist";
-export type CanvasMode = "select" | "hand";
+export type ItemKind = "note" | "text" | "board" | "link" | "image";
+export type CanvasMode = "select" | "hand" | "connect";
 export type ItemColor = "white" | "sand" | "yellow" | "blue" | "green" | "rose";
-
-export type ChecklistEntry = {
-  id: string;
-  text: string;
-  checked: boolean;
-};
 
 export type WorkspaceCanvas = {
   id: string;
   name: string;
+  parentId: string | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -21,7 +16,8 @@ export type CanvasItem = {
   kind: ItemKind;
   title: string;
   content: string;
-  checklist: ChecklistEntry[];
+  url: string;
+  nestedCanvasId: string | null;
   x: number;
   y: number;
   width: number;
@@ -31,6 +27,13 @@ export type CanvasItem = {
   updatedAt: number;
 };
 
+export type CanvasLink = {
+  id: string;
+  canvasId: string;
+  fromId: string;
+  toId: string;
+};
+
 export type CanvasCamera = {
   x: number;
   y: number;
@@ -38,9 +41,12 @@ export type CanvasCamera = {
 };
 
 export type WorkspaceState = {
-  version: 2;
+  version: 3;
   canvases: WorkspaceCanvas[];
   items: CanvasItem[];
+  links: CanvasLink[];
   cameras: Record<string, CanvasCamera>;
   activeCanvasId: string;
 };
+
+export type PaletteKind = ItemKind | "connect";

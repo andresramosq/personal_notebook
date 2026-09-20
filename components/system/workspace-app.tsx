@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
 import { Icon } from "@/components/system/icon";
 import { WorkspaceSidebar } from "@/components/system/workspace-sidebar";
@@ -10,8 +10,10 @@ import type { CanvasMode } from "@/lib/workspace/types";
 export function WorkspaceApp() {
   const workspace = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
   const [mode, setMode] = useState<CanvasMode>("select");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [query, setQuery] = useState("");
 
   const deleteItem = workspace.deleteItem;
   const resetWorkspace = workspace.resetWorkspace;
@@ -26,6 +28,7 @@ export function WorkspaceApp() {
       if (!editing && event.key.toLowerCase() === "h") setMode("hand");
       if (event.key === "Escape") {
         setSelectedId(null);
+        setLinkSourceId(null);
         setMode("select");
       }
       if (
@@ -41,6 +44,17 @@ export function WorkspaceApp() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [deleteItem, selectedId]);
+
+  const visibleItems = useMemo(() => {
+    const value = query.trim().toLocaleLowerCase();
+    if (!value) return workspace.items;
+    return workspace.items.filter((item) =>
+      [item.title, item.content, item.url]
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(value),
+    );
+  }, [query, workspace.items]);
 
   if (!workspace.state) {
     return <main className="system-loading">Abriendo Libreta…</main>;
@@ -63,30 +77,42 @@ export function WorkspaceApp() {
     zoom: 1,
   };
 
+  const handleLink = (targetId: string) => {
+    if (!linkSourceId) {
+      setLinkSourceId(targetId);
+      setSelectedId(targetId);
+      return;
+    }
+    if (linkSourceId !== targetId) {
+      workspace.createLink(linkSourceId, targetId);
+    }
+    setLinkSourceId(null);
+    setSelectedId(targetId);
+    setMode("select");
+  };
+
   return (
     <main className="system-shell">
       <WorkspaceSidebar
-        canvases={workspace.state.canvases}
+        canvases={workspace.rootCanvases}
         activeId={workspace.activeCanvas.id}
+        mode={mode}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onSelect={(id) => {
           setSelectedId(null);
+          setLinkSourceId(null);
           workspace.setActiveCanvas(id);
         }}
         onCreate={() => {
           setSelectedId(null);
           workspace.createCanvas();
         }}
-        onDuplicate={(id) => {
-          setSelectedId(null);
-          workspace.duplicateCanvas(id);
+        onDelete={workspace.deleteCanvas}
+        onModeChange={(next) => {
+          setMode(next);
+          if (next !== "connect") setLinkSourceId(null);
         }}
-        onDelete={(id) => {
-          setSelectedId(null);
-          workspace.deleteCanvas(id);
-        }}
-        onExport={workspace.exportWorkspace}
       />
 
       <header className="system-header">
@@ -94,38 +120,62 @@ export function WorkspaceApp() {
           type="button"
           className="sidebar-toggle"
           onClick={() => setSidebarOpen(true)}
-          aria-label="Abrir lienzos"
+          aria-label="Abrir menú"
         >
           <Icon name="menu" />
         </button>
+
         <div className="canvas-heading">
+          {workspace.parentCanvas ? (
+            <button
+              type="button"
+              className="breadcrumb-back"
+              onClick={workspace.goToParentCanvas}
+            >
+              ← {workspace.parentCanvas.name}
+            </button>
+          ) : null}
           <input
             value={workspace.activeCanvas.name}
             onChange={(event) => workspace.renameCanvas(event.target.value)}
             aria-label="Nombre del lienzo"
           />
-          <span>{workspace.items.length} elementos</span>
         </div>
-        <div className="save-status">
-          <span />
-          Guardado
-        </div>
+
+        <label className="search-box">
+          <Icon name="search" size={15} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar en este lienzo"
+          />
+        </label>
       </header>
 
       <section className="system-content">
         <CanvasView
           key={workspace.activeCanvas.id}
-          items={workspace.items}
+          items={visibleItems}
+          links={workspace.links}
           camera={camera}
           selectedId={selectedId}
+          linkSourceId={linkSourceId}
           mode={mode}
           onModeChange={setMode}
           onCameraChange={workspace.updateCamera}
           onSelect={setSelectedId}
+          onLink={handleLink}
+          onDeleteLink={workspace.deleteLink}
           onCreate={workspace.createItem}
           onUpdate={workspace.updateItem}
-          onDuplicate={workspace.duplicateItem}
           onDelete={workspace.deleteItem}
+          onEnterBoard={(item) => {
+            if (item.nestedCanvasId) {
+              setSelectedId(null);
+              workspace.enterCanvas(item.nestedCanvasId);
+            }
+          }}
+          getNestedPreview={workspace.getNestedPreview}
         />
       </section>
     </main>

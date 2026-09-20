@@ -2,23 +2,20 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/system/icon";
-import { createId } from "@/lib/workspace/id";
-import type {
-  CanvasItem,
-  ChecklistEntry,
-  ItemColor,
-} from "@/lib/workspace/types";
+import type { CanvasItem, ItemColor } from "@/lib/workspace/types";
 
 type ObjectCardProps = {
   item: CanvasItem;
   zoom: number;
   selected: boolean;
+  linking: boolean;
+  nestedPreview: CanvasItem[];
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
   onUpdate: (changes: Partial<CanvasItem>) => void;
-  onDuplicate: () => void;
   onDelete: () => void;
+  onEnterBoard: () => void;
 };
 
 const COLORS: ItemColor[] = [
@@ -34,12 +31,14 @@ export const ObjectCard = memo(function ObjectCard({
   item,
   zoom,
   selected,
+  linking,
+  nestedPreview,
   onSelect,
   onMove,
   onResize,
   onUpdate,
-  onDuplicate,
   onDelete,
+  onEnterBoard,
 }: ObjectCardProps) {
   const [position, setPosition] = useState({ x: item.x, y: item.y });
   const positionRef = useRef(position);
@@ -51,7 +50,7 @@ export const ObjectCard = memo(function ObjectCard({
   }, [item.x, item.y]);
 
   const startDrag = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || linking) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect();
@@ -83,7 +82,7 @@ export const ObjectCard = memo(function ObjectCard({
     const origin = { width: item.width, height: item.height };
     const move = (moveEvent: PointerEvent) => {
       onResize(
-        Math.max(180, origin.width + (moveEvent.clientX - start.x) / zoom),
+        Math.max(160, origin.width + (moveEvent.clientX - start.x) / zoom),
         Math.max(70, origin.height + (moveEvent.clientY - start.y) / zoom),
       );
     };
@@ -95,19 +94,11 @@ export const ObjectCard = memo(function ObjectCard({
     window.addEventListener("pointerup", stop, { once: true });
   };
 
-  const updateChecklist = (entry: ChecklistEntry) => {
-    onUpdate({
-      checklist: item.checklist.map((candidate) =>
-        candidate.id === entry.id ? entry : candidate,
-      ),
-    });
-  };
-
   return (
     <article
       className={`canvas-item item-${item.kind} color-${item.color} ${
         selected ? "is-selected" : ""
-      }`}
+      } ${linking ? "is-linking" : ""}`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
         width: item.width,
@@ -117,7 +108,10 @@ export const ObjectCard = memo(function ObjectCard({
         event.stopPropagation();
         onSelect();
       }}
-      onDoubleClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => {
+        event.stopPropagation();
+        if (item.kind === "board") onEnterBoard();
+      }}
     >
       {selected ? (
         <div
@@ -137,10 +131,6 @@ export const ObjectCard = memo(function ObjectCard({
               />
             ))}
           </div>
-          <span />
-          <button type="button" onClick={onDuplicate} title="Duplicar">
-            <Icon name="copy" size={16} />
-          </button>
           <button
             type="button"
             className="danger"
@@ -158,113 +148,117 @@ export const ObjectCard = memo(function ObjectCard({
           <textarea
             className="text-content"
             value={item.content}
-            placeholder="Escribe algo…"
+            placeholder="Escribe un texto"
             onPointerDown={(event) => event.stopPropagation()}
             onChange={(event) => onUpdate({ content: event.target.value })}
           />
-        ) : (
+        ) : null}
+
+        {item.kind === "note" ? (
           <>
             <input
               className="item-title"
               value={item.title}
-              placeholder={
-                item.kind === "checklist" ? "Título de la lista" : "Título"
-              }
+              placeholder="Título"
               onPointerDown={(event) => event.stopPropagation()}
               onChange={(event) => onUpdate({ title: event.target.value })}
             />
-            {item.kind === "note" ? (
-              <textarea
-                className="note-content"
-                value={item.content}
-                placeholder="Escribe aquí…"
+            <textarea
+              className="note-content"
+              value={item.content}
+              placeholder="Escribe aquí…"
+              onPointerDown={(event) => event.stopPropagation()}
+              onChange={(event) => onUpdate({ content: event.target.value })}
+            />
+          </>
+        ) : null}
+
+        {item.kind === "board" ? (
+          <>
+            <div className="board-header">
+              <Icon name="board" size={15} />
+              <input
+                className="item-title"
+                value={item.title}
                 onPointerDown={(event) => event.stopPropagation()}
-                onChange={(event) => onUpdate({ content: event.target.value })}
+                onChange={(event) => onUpdate({ title: event.target.value })}
+              />
+            </div>
+            <div className="board-preview">
+              {nestedPreview.length ? (
+                nestedPreview.map((preview) => (
+                  <div key={preview.id} className={`preview-chip color-${preview.color}`}>
+                    {preview.title || preview.content || "Elemento"}
+                  </div>
+                ))
+              ) : (
+                <span className="board-empty">Doble clic para entrar</span>
+              )}
+            </div>
+          </>
+        ) : null}
+
+        {item.kind === "link" ? (
+          <>
+            <div className="link-header">
+              <Icon name="link" size={15} />
+              <input
+                className="item-title"
+                value={item.title}
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ title: event.target.value })}
+              />
+            </div>
+            <input
+              className="link-url"
+              value={item.url}
+              placeholder="https://"
+              onPointerDown={(event) => event.stopPropagation()}
+              onChange={(event) => onUpdate({ url: event.target.value })}
+            />
+            {item.url.startsWith("http") ? (
+              <a
+                className="link-open"
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                onPointerDown={(event) => event.stopPropagation()}
+              >
+                Abrir enlace
+              </a>
+            ) : null}
+          </>
+        ) : null}
+
+        {item.kind === "image" ? (
+          <>
+            <input
+              className="item-title"
+              value={item.title}
+              placeholder="Imagen"
+              onPointerDown={(event) => event.stopPropagation()}
+              onChange={(event) => onUpdate({ title: event.target.value })}
+            />
+            {item.url.startsWith("http") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="image-preview"
+                src={item.url}
+                alt={item.title || "Imagen"}
               />
             ) : (
-              <div className="checklist">
-                {item.checklist.map((entry) => (
-                  <div className="checklist-row" key={entry.id}>
-                    <button
-                      type="button"
-                      className={entry.checked ? "is-checked" : ""}
-                      onClick={() =>
-                        updateChecklist({ ...entry, checked: !entry.checked })
-                      }
-                      aria-label={
-                        entry.checked
-                          ? "Marcar como pendiente"
-                          : "Marcar como completado"
-                      }
-                    >
-                      {entry.checked ? <Icon name="check" size={13} /> : null}
-                    </button>
-                    <input
-                      value={entry.text}
-                      className={entry.checked ? "is-checked" : ""}
-                      placeholder="Nueva tarea"
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onChange={(event) =>
-                        updateChecklist({ ...entry, text: event.target.value })
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          onUpdate({
-                            checklist: [
-                              ...item.checklist,
-                              {
-                                id: createId(),
-                                text: "",
-                                checked: false,
-                              },
-                            ],
-                          });
-                        }
-                      }}
-                    />
-                    {item.checklist.length > 1 ? (
-                      <button
-                        type="button"
-                        className="checklist-remove"
-                        onClick={() =>
-                          onUpdate({
-                            checklist: item.checklist.filter(
-                              (candidate) => candidate.id !== entry.id,
-                            ),
-                          })
-                        }
-                        aria-label="Quitar tarea"
-                      >
-                        <Icon name="close" size={13} />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="checklist-add"
-                  onClick={() =>
-                    onUpdate({
-                      checklist: [
-                        ...item.checklist,
-                        {
-                          id: createId(),
-                          text: "",
-                          checked: false,
-                        },
-                      ],
-                    })
-                  }
-                >
-                  <Icon name="plus" size={14} />
-                  Añadir
-                </button>
-              </div>
+              <input
+                className="link-url"
+                value={item.url}
+                placeholder="Pega la URL de la imagen"
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ url: event.target.value })}
+              />
             )}
           </>
-        )}
+        ) : null}
       </div>
+
       {selected ? (
         <button
           type="button"

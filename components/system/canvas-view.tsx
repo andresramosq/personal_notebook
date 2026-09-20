@@ -1,44 +1,54 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { CanvasToolbar } from "@/components/system/canvas-toolbar";
-import { Icon } from "@/components/system/icon";
 import { ObjectCard } from "@/components/system/object-card";
 import type {
   CanvasCamera,
   CanvasItem,
+  CanvasLink,
   CanvasMode,
   ItemKind,
 } from "@/lib/workspace/types";
 
 type CanvasViewProps = {
   items: CanvasItem[];
+  links: CanvasLink[];
   camera: CanvasCamera;
   selectedId: string | null;
+  linkSourceId: string | null;
   mode: CanvasMode;
   onModeChange: (mode: CanvasMode) => void;
   onCameraChange: (camera: CanvasCamera) => void;
   onSelect: (id: string | null) => void;
+  onLink: (targetId: string) => void;
+  onDeleteLink: (linkId: string) => void;
   onCreate: (kind: ItemKind, position: { x: number; y: number }) => string;
   onUpdate: (id: string, changes: Partial<CanvasItem>) => void;
-  onDuplicate: (id: string) => string;
   onDelete: (id: string) => void;
+  onEnterBoard: (item: CanvasItem) => void;
+  getNestedPreview: (canvasId: string) => CanvasItem[];
 };
 
 const DEFAULT_CAMERA: CanvasCamera = { x: 0, y: 0, zoom: 1 };
+const ITEM_KINDS: ItemKind[] = ["note", "text", "image", "link", "board"];
 
 export function CanvasView({
   items,
+  links,
   camera,
   selectedId,
+  linkSourceId,
   mode,
   onModeChange,
   onCameraChange,
   onSelect,
+  onLink,
+  onDeleteLink,
   onCreate,
   onUpdate,
-  onDuplicate,
   onDelete,
+  onEnterBoard,
+  getNestedPreview,
 }: CanvasViewProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef(camera);
@@ -59,28 +69,11 @@ export function CanvasView({
     };
   };
 
-  const createAtCenter = (kind: ItemKind) => {
-    const rect = viewportRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const center = toWorld(
-      rect.left + rect.width / 2,
-      rect.top + rect.height / 2,
-    );
-    const offset = items.length % 5;
-    const id = onCreate(kind, {
-      x: center.x - 140 + offset * 22,
-      y: center.y - 90 + offset * 22,
-    });
-    onSelect(id);
-    onModeChange("select");
-  };
-
   const startPan = (event: React.PointerEvent<HTMLElement>) => {
-    const shouldPan = mode === "hand" || event.button === 1;
-    if (!shouldPan) return;
-
+    if (mode !== "hand" && event.button !== 1) return;
     event.preventDefault();
     onSelect(null);
+
     const start = { x: event.clientX, y: event.clientY };
     const origin = cameraRef.current;
     const move = (moveEvent: PointerEvent) => {
@@ -148,6 +141,16 @@ export function CanvasView({
     });
   };
 
+  const handleItemSelect = (item: CanvasItem) => {
+    if (mode === "connect") {
+      onLink(item.id);
+      return;
+    }
+    onSelect(item.id);
+  };
+
+  const byId = new Map(items.map((item) => [item.id, item]));
+
   return (
     <section
       ref={viewportRef}
@@ -155,16 +158,16 @@ export function CanvasView({
       onPointerDown={(event) => {
         if (mode === "hand" || event.button === 1) {
           startPan(event);
-        } else {
+        } else if (event.target === event.currentTarget) {
           onSelect(null);
         }
       }}
       onDoubleClick={(event) => {
-        if (mode !== "select") return;
+        if (mode !== "select" || event.target !== event.currentTarget) return;
         const position = toWorld(event.clientX, event.clientY);
         const id = onCreate("note", {
           x: position.x - 140,
-          y: position.y - 95,
+          y: position.y - 100,
         });
         onSelect(id);
       }}
@@ -182,11 +185,11 @@ export function CanvasView({
         const kind = (event.dataTransfer.getData(
           "application/x-libreta-item",
         ) || event.dataTransfer.getData("text/plain")) as ItemKind;
-        if (!["note", "text", "checklist"].includes(kind)) return;
+        if (!ITEM_KINDS.includes(kind)) return;
         event.preventDefault();
         const position = toWorld(event.clientX, event.clientY);
         const id = onCreate(kind, {
-          x: position.x - 140,
+          x: position.x - 130,
           y: position.y - 80,
         });
         onSelect(id);
@@ -203,60 +206,80 @@ export function CanvasView({
           transform: `translate3d(${liveCamera.x}px, ${liveCamera.y}px, 0) scale(${liveCamera.zoom})`,
         }}
       >
+        <svg className="connection-layer" width="10000" height="10000">
+          {links.map((link) => {
+            const from = byId.get(link.fromId);
+            const to = byId.get(link.toId);
+            if (!from || !to) return null;
+            return (
+              <line
+                key={link.id}
+                x1={from.x + from.width / 2}
+                y1={from.y + from.height / 2}
+                x2={to.x + to.width / 2}
+                y2={to.y + to.height / 2}
+                onDoubleClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteLink(link.id);
+                }}
+              />
+            );
+          })}
+        </svg>
+
         {items.map((item) => (
           <ObjectCard
             key={item.id}
             item={item}
             zoom={liveCamera.zoom}
             selected={selectedId === item.id}
-            onSelect={() => onSelect(item.id)}
+            linking={mode === "connect"}
+            nestedPreview={
+              item.kind === "board" && item.nestedCanvasId
+                ? getNestedPreview(item.nestedCanvasId)
+                : []
+            }
+            onSelect={() => handleItemSelect(item)}
             onMove={(x, y) => onUpdate(item.id, { x, y })}
             onResize={(width, height) => onUpdate(item.id, { width, height })}
             onUpdate={(changes) => onUpdate(item.id, changes)}
-            onDuplicate={() => onSelect(onDuplicate(item.id))}
             onDelete={() => {
               onDelete(item.id);
               onSelect(null);
             }}
+            onEnterBoard={() => onEnterBoard(item)}
           />
         ))}
       </div>
 
       {!items.length ? (
-        <div
-          className="canvas-empty"
-          onPointerDown={(event) => event.stopPropagation()}
-          onDoubleClick={(event) => event.stopPropagation()}
-        >
-          <div className="empty-icon">
-            <Icon name="note" size={24} />
-          </div>
+        <div className="canvas-empty">
           <strong>Este lienzo está vacío</strong>
-          <span>
-            Crea algo con la barra inferior o haz doble clic en el lienzo.
-          </span>
-          <button type="button" onClick={() => createAtCenter("note")}>
-            <Icon name="plus" size={16} />
-            Crear mi primera nota
-          </button>
+          <span>Arrastra un elemento desde la barra lateral.</span>
         </div>
       ) : null}
 
-      <CanvasToolbar
-        mode={mode}
-        onModeChange={onModeChange}
-        onCreate={createAtCenter}
-      />
-      <div
-        className="canvas-controls"
-        onPointerDown={(event) => event.stopPropagation()}
-        onDoubleClick={(event) => event.stopPropagation()}
-      >
+      <div className="canvas-tools">
         <button
           type="button"
-          onClick={() => zoomAtCenter(0.85)}
-          aria-label="Alejar"
+          className={mode === "select" ? "is-active" : ""}
+          onClick={() => onModeChange("select")}
+          title="Seleccionar"
         >
+          ↖
+        </button>
+        <button
+          type="button"
+          className={mode === "hand" ? "is-active" : ""}
+          onClick={() => onModeChange("hand")}
+          title="Mover lienzo"
+        >
+          ✋
+        </button>
+      </div>
+
+      <div className="canvas-controls">
+        <button type="button" onClick={() => zoomAtCenter(0.85)} aria-label="Alejar">
           −
         </button>
         <button
@@ -267,14 +290,18 @@ export function CanvasView({
         >
           {Math.round(liveCamera.zoom * 100)}%
         </button>
-        <button
-          type="button"
-          onClick={() => zoomAtCenter(1.15)}
-          aria-label="Acercar"
-        >
+        <button type="button" onClick={() => zoomAtCenter(1.15)} aria-label="Acercar">
           +
         </button>
       </div>
+
+      {mode === "connect" ? (
+        <div className="connect-hint">
+          {linkSourceId
+            ? "Haz clic en el segundo elemento"
+            : "Haz clic en el primer elemento"}
+        </div>
+      ) : null}
     </section>
   );
 }
