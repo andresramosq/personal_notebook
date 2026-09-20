@@ -142,6 +142,19 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
+      {linking ? (
+        <button
+          type="button"
+          className="link-target-overlay"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect();
+          }}
+          aria-label={`Conectar ${item.title || "elemento"}`}
+        />
+      ) : null}
+
       <div className="item-drag-area" onPointerDown={startDrag} />
       <div className="item-content">
         {item.kind === "text" ? (

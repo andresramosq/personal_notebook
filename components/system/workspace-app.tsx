@@ -160,12 +160,12 @@ export function WorkspaceApp() {
         >
           <span />
           {workspace.persistenceStatus === "loading"
-            ? "Conectando"
+            ? "BD · Conectando"
             : workspace.persistenceStatus === "saving"
-              ? "Guardando"
+              ? "BD · Guardando"
               : workspace.persistenceStatus === "error"
-                ? "Copia local"
-                : "Guardado"}
+                ? "BD sin conexión"
+                : "BD · Guardado"}
         </div>
       </header>
 
