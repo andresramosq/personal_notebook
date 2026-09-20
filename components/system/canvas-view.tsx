@@ -77,7 +77,7 @@ export function CanvasView({
 
   const startPan = (event: React.PointerEvent<HTMLElement>) => {
     const shouldPan = mode === "hand" || event.button === 1;
-    if (!shouldPan || event.target !== event.currentTarget) return;
+    if (!shouldPan) return;
 
     event.preventDefault();
     onSelect(null);
@@ -153,7 +153,6 @@ export function CanvasView({
       ref={viewportRef}
       className={`canvas-view mode-${mode}`}
       onPointerDown={(event) => {
-        if (event.target !== event.currentTarget) return;
         if (mode === "hand" || event.button === 1) {
           startPan(event);
         } else {
@@ -161,7 +160,7 @@ export function CanvasView({
         }
       }}
       onDoubleClick={(event) => {
-        if (event.target !== event.currentTarget || mode !== "select") return;
+        if (mode !== "select") return;
         const position = toWorld(event.clientX, event.clientY);
         const id = onCreate("note", {
           x: position.x - 140,
@@ -171,15 +170,18 @@ export function CanvasView({
       }}
       onWheel={handleWheel}
       onDragOver={(event) => {
-        if (event.dataTransfer.types.includes("application/x-libreta-item")) {
+        if (
+          event.dataTransfer.types.includes("application/x-libreta-item") ||
+          event.dataTransfer.types.includes("text/plain")
+        ) {
           event.preventDefault();
           event.dataTransfer.dropEffect = "copy";
         }
       }}
       onDrop={(event) => {
-        const kind = event.dataTransfer.getData(
+        const kind = (event.dataTransfer.getData(
           "application/x-libreta-item",
-        ) as ItemKind;
+        ) || event.dataTransfer.getData("text/plain")) as ItemKind;
         if (!["note", "text", "checklist"].includes(kind)) return;
         event.preventDefault();
         const position = toWorld(event.clientX, event.clientY);
@@ -221,7 +223,11 @@ export function CanvasView({
       </div>
 
       {!items.length ? (
-        <div className="canvas-empty">
+        <div
+          className="canvas-empty"
+          onPointerDown={(event) => event.stopPropagation()}
+          onDoubleClick={(event) => event.stopPropagation()}
+        >
           <div className="empty-icon">
             <Icon name="note" size={24} />
           </div>
@@ -241,7 +247,11 @@ export function CanvasView({
         onModeChange={onModeChange}
         onCreate={createAtCenter}
       />
-      <div className="canvas-controls">
+      <div
+        className="canvas-controls"
+        onPointerDown={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
         <button
           type="button"
           onClick={() => zoomAtCenter(0.85)}

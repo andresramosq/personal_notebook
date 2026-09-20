@@ -116,6 +116,7 @@ export const ObjectCard = memo(function ObjectCard({
         event.stopPropagation();
         onSelect();
       }}
+      onDoubleClick={(event) => event.stopPropagation()}
     >
       {selected ? (
         <div

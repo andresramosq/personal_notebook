@@ -25,7 +25,12 @@ export function CanvasToolbar({
   ];
 
   return (
-    <div className="canvas-toolbar" aria-label="Herramientas del lienzo">
+    <div
+      className="canvas-toolbar"
+      aria-label="Herramientas del lienzo"
+      onPointerDown={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+    >
       <div className="toolbar-group">
         <button
           type="button"
@@ -57,6 +62,7 @@ export function CanvasToolbar({
                 "application/x-libreta-item",
                 tool.kind,
               );
+              event.dataTransfer.setData("text/plain", tool.kind);
               event.dataTransfer.effectAllowed = "copy";
             }}
             title={`${tool.label} · clic o arrastra al lienzo`}
