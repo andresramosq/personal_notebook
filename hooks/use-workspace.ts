@@ -1,18 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  createInitialWorkspace,
-  loadWorkspace,
-  saveWorkspace,
-} from "@/lib/workspace/storage";
+import { loadWorkspace, saveWorkspace } from "@/lib/workspace/storage";
 import type {
-  DrawingPoint,
-  ObjectKind,
-  WorkspaceLink,
-  WorkspaceObject,
+  CanvasCamera,
+  CanvasItem,
+  ItemKind,
   WorkspaceState,
-  WorkspaceView,
 } from "@/lib/workspace/types";
 
 export function useWorkspace() {
@@ -29,21 +23,15 @@ export function useWorkspace() {
     }
   }, [state]);
 
-  const activeSpace = useMemo(
-    () => state?.spaces.find((space) => space.id === state.activeSpaceId),
+  const activeCanvas = useMemo(
+    () => state?.canvases.find((canvas) => canvas.id === state.activeCanvasId),
     [state],
   );
 
-  const objects = useMemo(
+  const items = useMemo(
     () =>
-      state?.objects.filter((object) => object.spaceId === state.activeSpaceId) ??
+      state?.items.filter((item) => item.canvasId === state.activeCanvasId) ??
       [],
-    [state],
-  );
-
-  const links = useMemo(
-    () =>
-      state?.links.filter((link) => link.spaceId === state.activeSpaceId) ?? [],
     [state],
   );
 
@@ -51,256 +39,249 @@ export function useWorkspace() {
     setState((current) => (current ? recipe(current) : current));
   };
 
-  const createSpace = () => {
+  const createCanvas = () => {
     const id = crypto.randomUUID();
+    const now = Date.now();
     update((current) => ({
       ...current,
-      activeSpaceId: id,
-      spaces: [
-        ...current.spaces,
+      activeCanvasId: id,
+      canvases: [
+        ...current.canvases,
         {
           id,
-          name: `Espacio ${current.spaces.length + 1}`,
-          view: "canvas",
-          createdAt: Date.now(),
+          name: `Lienzo ${current.canvases.length + 1}`,
+          createdAt: now,
+          updatedAt: now,
         },
       ],
+      cameras: { ...current.cameras, [id]: { x: 0, y: 0, zoom: 1 } },
     }));
+    return id;
   };
 
-  const setActiveSpace = (id: string) => {
-    update((current) => ({ ...current, activeSpaceId: id }));
+  const setActiveCanvas = (id: string) => {
+    update((current) => ({ ...current, activeCanvasId: id }));
   };
 
-  const updateSpace = (changes: { name?: string; view?: WorkspaceView }) => {
+  const renameCanvas = (name: string) => {
     update((current) => ({
       ...current,
-      spaces: current.spaces.map((space) =>
-        space.id === current.activeSpaceId ? { ...space, ...changes } : space,
+      canvases: current.canvases.map((canvas) =>
+        canvas.id === current.activeCanvasId
+          ? { ...canvas, name, updatedAt: Date.now() }
+          : canvas,
       ),
     }));
   };
 
-  const deleteSpace = (id: string) => {
+  const duplicateCanvas = (id: string) => {
+    if (!state) return;
+    const source = state.canvases.find((canvas) => canvas.id === id);
+    if (!source) return;
+
+    const newId = crypto.randomUUID();
+    const now = Date.now();
+    const copiedItems = state.items
+      .filter((item) => item.canvasId === id)
+      .map((item) => ({
+        ...item,
+        id: crypto.randomUUID(),
+        canvasId: newId,
+        createdAt: now,
+        updatedAt: now,
+        checklist: item.checklist.map((entry) => ({
+          ...entry,
+          id: crypto.randomUUID(),
+        })),
+      }));
+
+    update((current) => ({
+      ...current,
+      activeCanvasId: newId,
+      canvases: [
+        ...current.canvases,
+        {
+          ...source,
+          id: newId,
+          name: `${source.name} (copia)`,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      items: [...current.items, ...copiedItems],
+      cameras: {
+        ...current.cameras,
+        [newId]: current.cameras[id] ?? { x: 0, y: 0, zoom: 1 },
+      },
+    }));
+  };
+
+  const deleteCanvas = (id: string) => {
     update((current) => {
-      if (current.spaces.length === 1) {
+      if (current.canvases.length === 1) {
         return current;
       }
 
-      const spaces = current.spaces.filter((space) => space.id !== id);
-      const objectIds = new Set(
-        current.objects
-          .filter((object) => object.spaceId === id)
-          .map((object) => object.id),
-      );
+      const canvases = current.canvases.filter((canvas) => canvas.id !== id);
+      const cameras = { ...current.cameras };
+      delete cameras[id];
 
       return {
         ...current,
-        activeSpaceId:
-          current.activeSpaceId === id ? spaces[0].id : current.activeSpaceId,
-        spaces,
-        objects: current.objects.filter((object) => object.spaceId !== id),
-        links: current.links.filter(
-          (link) =>
-            link.spaceId !== id &&
-            !objectIds.has(link.fromId) &&
-            !objectIds.has(link.toId),
-        ),
+        activeCanvasId:
+          current.activeCanvasId === id
+            ? canvases[0].id
+            : current.activeCanvasId,
+        canvases,
+        items: current.items.filter((item) => item.canvasId !== id),
+        cameras,
       };
     });
   };
 
-  const createObject = (
-    position?: { x: number; y: number },
-    kind: ObjectKind = "card",
-    size?: { width: number; height: number },
-    points: DrawingPoint[] = [],
-  ) => {
+  const createItem = (kind: ItemKind, position: { x: number; y: number }) => {
     if (!state) {
       return "";
     }
 
     const id = crypto.randomUUID();
     const now = Date.now();
-    const index = objects.length;
     const defaults: Record<
-      ObjectKind,
-      Pick<WorkspaceObject, "title" | "description" | "color" | "width" | "height">
+      ItemKind,
+      Pick<
+        CanvasItem,
+        "title" | "content" | "width" | "height" | "color" | "checklist"
+      >
     > = {
-      card: {
-        title: "Nuevo objeto",
-        description: "",
-        color: "#ffffff",
-        width: 280,
-        height: 180,
-      },
       note: {
         title: "Nueva nota",
-        description: "Escribe aquí…",
-        color: "#fff3bf",
-        width: 240,
-        height: 210,
+        content: "",
+        width: 280,
+        height: 190,
+        color: "white",
+        checklist: [],
       },
       text: {
-        title: "Texto",
-        description: "",
-        color: "transparent",
-        width: 240,
-        height: 80,
-      },
-      rectangle: {
         title: "",
-        description: "",
-        color: "#dbeafe",
-        width: 220,
-        height: 140,
+        content: "Escribe un texto",
+        width: 300,
+        height: 90,
+        color: "white",
+        checklist: [],
       },
-      ellipse: {
-        title: "",
-        description: "",
-        color: "#f3e8ff",
-        width: 180,
-        height: 140,
-      },
-      page: {
-        title: "Nueva página",
-        description: "Documento vacío",
-        color: "#ffffff",
+      checklist: {
+        title: "Nueva lista",
+        content: "",
         width: 300,
         height: 220,
-      },
-      database: {
-        title: "Base de datos",
-        description: "",
-        color: "#ffffff",
-        width: 420,
-        height: 260,
-      },
-      drawing: {
-        title: "",
-        description: "",
-        color: "transparent",
-        width: 1,
-        height: 1,
+        color: "white",
+        checklist: [{ id: crypto.randomUUID(), text: "", checked: false }],
       },
     };
     const preset = defaults[kind];
-    const object: WorkspaceObject = {
+    const item: CanvasItem = {
       id,
-      spaceId: state.activeSpaceId,
+      canvasId: state.activeCanvasId,
       kind,
       title: preset.title,
-      description: preset.description,
-      status: "inbox",
-      x: position?.x ?? 160 + (index % 5) * 32,
-      y: position?.y ?? 120 + (index % 5) * 32,
-      width: size?.width ?? preset.width,
-      height: size?.height ?? preset.height,
+      content: preset.content,
+      checklist: preset.checklist,
+      x: position.x,
+      y: position.y,
+      width: preset.width,
+      height: preset.height,
       color: preset.color,
-      startDate: "",
-      endDate: "",
-      reminder: "",
-      recurrence: "",
-      person: "",
-      tags: [],
-      properties: [],
-      points,
-      databaseRows:
-        kind === "database"
-          ? [
-              {
-                id: crypto.randomUUID(),
-                title: "Primer registro",
-                status: "inbox",
-                value: "",
-              },
-            ]
-          : [],
-      strokeColor: "#292929",
-      strokeWidth: 2,
       createdAt: now,
       updatedAt: now,
     };
 
     update((current) => ({
       ...current,
-      objects: [...current.objects, object],
+      items: [...current.items, item],
     }));
 
     return id;
   };
 
-  const updateObject = (id: string, changes: Partial<WorkspaceObject>) => {
+  const updateItem = (id: string, changes: Partial<CanvasItem>) => {
     update((current) => ({
       ...current,
-      objects: current.objects.map((object) =>
-        object.id === id
-          ? { ...object, ...changes, updatedAt: Date.now() }
-          : object,
+      items: current.items.map((item) =>
+        item.id === id ? { ...item, ...changes, updatedAt: Date.now() } : item,
       ),
     }));
   };
 
-  const deleteObject = (id: string) => {
+  const deleteItem = (id: string) => {
     update((current) => ({
       ...current,
-      objects: current.objects.filter((object) => object.id !== id),
-      links: current.links.filter(
-        (link) => link.fromId !== id && link.toId !== id,
-      ),
+      items: current.items.filter((item) => item.id !== id),
     }));
   };
 
-  const createLink = (fromId: string, toId: string) => {
-    if (!state || fromId === toId) {
-      return;
-    }
-
-    const exists = state.links.some(
-      (link) =>
-        link.spaceId === state.activeSpaceId &&
-        ((link.fromId === fromId && link.toId === toId) ||
-          (link.fromId === toId && link.toId === fromId)),
-    );
-
-    if (exists) {
-      return;
-    }
-
-    const link: WorkspaceLink = {
-      id: crypto.randomUUID(),
-      spaceId: state.activeSpaceId,
-      fromId,
-      toId,
-      label: "",
-    };
-
-    update((current) => ({ ...current, links: [...current.links, link] }));
-  };
-
-  const deleteLink = (id: string) => {
+  const duplicateItem = (id: string) => {
+    const item = state?.items.find((candidate) => candidate.id === id);
+    if (!item) return "";
+    const newId = crypto.randomUUID();
+    const now = Date.now();
     update((current) => ({
       ...current,
-      links: current.links.filter((link) => link.id !== id),
+      items: [
+        ...current.items,
+        {
+          ...item,
+          id: newId,
+          x: item.x + 28,
+          y: item.y + 28,
+          checklist: item.checklist.map((entry) => ({
+            ...entry,
+            id: crypto.randomUUID(),
+          })),
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    }));
+    return newId;
+  };
+
+  const updateCamera = (camera: CanvasCamera) => {
+    update((current) => ({
+      ...current,
+      cameras: {
+        ...current.cameras,
+        [current.activeCanvasId]: camera,
+      },
     }));
   };
 
-  const reset = () => setState(createInitialWorkspace());
+  const exportWorkspace = () => {
+    if (!state) return;
+    const blob = new Blob([JSON.stringify(state, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `libreta-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   return {
     state,
-    activeSpace,
-    objects,
-    links,
-    createSpace,
-    setActiveSpace,
-    updateSpace,
-    deleteSpace,
-    createObject,
-    updateObject,
-    deleteObject,
-    createLink,
-    deleteLink,
-    reset,
+    activeCanvas,
+    items,
+    createCanvas,
+    setActiveCanvas,
+    renameCanvas,
+    duplicateCanvas,
+    deleteCanvas,
+    createItem,
+    updateItem,
+    duplicateItem,
+    deleteItem,
+    updateCamera,
+    exportWorkspace,
   };
 }

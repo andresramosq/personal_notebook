@@ -1,314 +1,275 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CanvasToolbar } from "@/components/system/canvas-toolbar";
+import { Icon } from "@/components/system/icon";
 import { ObjectCard } from "@/components/system/object-card";
 import type {
-  CanvasTool,
-  DrawingPoint,
-  ObjectKind,
-  WorkspaceLink,
-  WorkspaceObject,
+  CanvasCamera,
+  CanvasItem,
+  CanvasMode,
+  ItemKind,
 } from "@/lib/workspace/types";
 
-type Camera = { x: number; y: number; zoom: number };
-
 type CanvasViewProps = {
-  objects: WorkspaceObject[];
-  links: WorkspaceLink[];
+  items: CanvasItem[];
+  camera: CanvasCamera;
   selectedId: string | null;
-  activeTool: CanvasTool;
-  onToolChange: (tool: CanvasTool) => void;
+  mode: CanvasMode;
+  onModeChange: (mode: CanvasMode) => void;
+  onCameraChange: (camera: CanvasCamera) => void;
   onSelect: (id: string | null) => void;
-  onMove: (id: string, x: number, y: number) => void;
-  onResize: (id: string, width: number, height: number) => void;
-  onUpdate: (id: string, changes: Partial<WorkspaceObject>) => void;
-  onCreate: (
-    position: { x: number; y: number },
-    kind?: ObjectKind,
-    size?: { width: number; height: number },
-    points?: DrawingPoint[],
-  ) => void;
-  onLinkObject: (id: string) => void;
-  onDeleteLink: (id: string) => void;
+  onCreate: (kind: ItemKind, position: { x: number; y: number }) => string;
+  onUpdate: (id: string, changes: Partial<CanvasItem>) => void;
+  onDuplicate: (id: string) => string;
+  onDelete: (id: string) => void;
 };
 
-const INITIAL_CAMERA: Camera = { x: 0, y: 0, zoom: 1 };
+const DEFAULT_CAMERA: CanvasCamera = { x: 0, y: 0, zoom: 1 };
 
 export function CanvasView({
-  objects,
-  links,
+  items,
+  camera,
   selectedId,
-  activeTool,
-  onToolChange,
+  mode,
+  onModeChange,
+  onCameraChange,
   onSelect,
-  onMove,
-  onResize,
-  onUpdate,
   onCreate,
-  onLinkObject,
-  onDeleteLink,
+  onUpdate,
+  onDuplicate,
+  onDelete,
 }: CanvasViewProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const cameraRef = useRef(INITIAL_CAMERA);
-  const [camera, setCamera] = useState(INITIAL_CAMERA);
-  const [draft, setDraft] = useState<{
-    kind: "rectangle" | "ellipse";
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  const [drawing, setDrawing] = useState<DrawingPoint[]>([]);
+  const cameraRef = useRef(camera);
+  const [liveCamera, setLiveCamera] = useState(camera);
 
-  const updateCamera = (next: Camera) => {
+  useEffect(() => {
+    cameraRef.current = camera;
+    setLiveCamera(camera);
+  }, [camera]);
+
+  const setCamera = (next: CanvasCamera, persist = true) => {
     cameraRef.current = next;
-    setCamera(next);
-  };
-
-  const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (
-      event.button !== 0 ||
-      event.target !== event.currentTarget ||
-      activeTool !== "hand"
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    onSelect(null);
-    const start = { x: event.clientX, y: event.clientY };
-    const origin = cameraRef.current;
-
-    const move = (moveEvent: PointerEvent) => {
-      updateCamera({
-        ...origin,
-        x: origin.x + moveEvent.clientX - start.x,
-        y: origin.y + moveEvent.clientY - start.y,
-      });
-    };
-
-    const stop = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-    };
-
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop, { once: true });
+    setLiveCamera(next);
+    if (persist) onCameraChange(next);
   };
 
   const toWorld = (clientX: number, clientY: number) => {
-    const viewport = viewportRef.current;
-    if (!viewport) return { x: 0, y: 0 };
-    const rect = viewport.getBoundingClientRect();
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
     return {
       x: (clientX - rect.left - cameraRef.current.x) / cameraRef.current.zoom,
       y: (clientY - rect.top - cameraRef.current.y) / cameraRef.current.zoom,
     };
   };
 
-  const startCreating = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || event.target !== event.currentTarget) return;
+  const createAtCenter = (kind: ItemKind) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const center = toWorld(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
+    const offset = items.length % 5;
+    const id = onCreate(kind, {
+      x: center.x - 140 + offset * 22,
+      y: center.y - 90 + offset * 22,
+    });
+    onSelect(id);
+    onModeChange("select");
+  };
 
-    if (activeTool === "select") {
-      onSelect(null);
-      return;
-    }
-    if (activeTool === "hand") {
-      startPan(event);
-      return;
-    }
-    if (activeTool === "connect") return;
+  const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const shouldPan = mode === "hand" || event.button === 1;
+    if (!shouldPan || event.target !== event.currentTarget) return;
 
-    const start = toWorld(event.clientX, event.clientY);
-
-    if (activeTool === "draw") {
-      const points = [start];
-      setDrawing(points);
-      const move = (moveEvent: PointerEvent) => {
-        points.push(toWorld(moveEvent.clientX, moveEvent.clientY));
-        setDrawing([...points]);
-      };
-      const stop = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", stop);
-        if (points.length > 1) {
-          onCreate({ x: 0, y: 0 }, "drawing", undefined, points);
-        }
-        setDrawing([]);
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", stop, { once: true });
-      return;
-    }
-
-    if (activeTool === "rectangle" || activeTool === "ellipse") {
-      const kind = activeTool;
-      const move = (moveEvent: PointerEvent) => {
-        const current = toWorld(moveEvent.clientX, moveEvent.clientY);
-        setDraft({
-          kind,
-          x: Math.min(start.x, current.x),
-          y: Math.min(start.y, current.y),
-          width: Math.max(20, Math.abs(current.x - start.x)),
-          height: Math.max(20, Math.abs(current.y - start.y)),
-        });
-      };
-      const stop = (upEvent: PointerEvent) => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", stop);
-        const end = toWorld(upEvent.clientX, upEvent.clientY);
-        onCreate(
-          { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y) },
-          kind,
-          {
-            width: Math.max(80, Math.abs(end.x - start.x)),
-            height: Math.max(50, Math.abs(end.y - start.y)),
-          },
-        );
-        setDraft(null);
-        onToolChange("select");
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", stop, { once: true });
-      return;
-    }
-
-    const kind = activeTool as ObjectKind;
-    onCreate({ x: start.x - 120, y: start.y - 70 }, kind);
-    onToolChange("select");
+    event.preventDefault();
+    onSelect(null);
+    const start = { x: event.clientX, y: event.clientY };
+    const origin = cameraRef.current;
+    const move = (moveEvent: PointerEvent) => {
+      setCamera(
+        {
+          ...origin,
+          x: origin.x + moveEvent.clientX - start.x,
+          y: origin.y + moveEvent.clientY - start.y,
+        },
+        false,
+      );
+    };
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      onCameraChange(cameraRef.current);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const viewport = viewportRef.current;
-    if (!viewport) return;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-    const rect = viewport.getBoundingClientRect();
-    const current = cameraRef.current;
-    const pointerX = event.clientX - rect.left;
-    const pointerY = event.clientY - rect.top;
-    const worldX = (pointerX - current.x) / current.zoom;
-    const worldY = (pointerY - current.y) / current.zoom;
-    const zoom = Math.min(
-      2.4,
-      Math.max(0.3, current.zoom * Math.exp(-event.deltaY * 0.001)),
-    );
+    if (event.ctrlKey || event.metaKey) {
+      const current = cameraRef.current;
+      const pointerX = event.clientX - rect.left;
+      const pointerY = event.clientY - rect.top;
+      const worldX = (pointerX - current.x) / current.zoom;
+      const worldY = (pointerY - current.y) / current.zoom;
+      const zoom = Math.min(
+        2,
+        Math.max(0.35, current.zoom * Math.exp(-event.deltaY * 0.008)),
+      );
+      setCamera({
+        zoom,
+        x: pointerX - worldX * zoom,
+        y: pointerY - worldY * zoom,
+      });
+      return;
+    }
 
-    updateCamera({
-      zoom,
-      x: pointerX - worldX * zoom,
-      y: pointerY - worldY * zoom,
+    setCamera({
+      ...cameraRef.current,
+      x: cameraRef.current.x - event.deltaX,
+      y: cameraRef.current.y - event.deltaY,
     });
   };
 
-  const handleDoubleClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    onCreate({
-      x: (event.clientX - rect.left - camera.x) / camera.zoom - 140,
-      y: (event.clientY - rect.top - camera.y) / camera.zoom - 90,
-    }, "card");
+  const zoomAtCenter = (factor: number) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const current = cameraRef.current;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const worldX = (centerX - current.x) / current.zoom;
+    const worldY = (centerY - current.y) / current.zoom;
+    const zoom = Math.min(2, Math.max(0.35, current.zoom * factor));
+    setCamera({
+      zoom,
+      x: centerX - worldX * zoom,
+      y: centerY - worldY * zoom,
+    });
   };
-
-  const byId = new Map(objects.map((object) => [object.id, object]));
 
   return (
     <section
       ref={viewportRef}
-      className={`canvas-view ${activeTool === "connect" ? "is-connecting" : ""}`}
-      onPointerDown={startCreating}
+      className={`canvas-view mode-${mode}`}
+      onPointerDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (mode === "hand" || event.button === 1) {
+          startPan(event);
+        } else {
+          onSelect(null);
+        }
+      }}
+      onDoubleClick={(event) => {
+        if (event.target !== event.currentTarget || mode !== "select") return;
+        const position = toWorld(event.clientX, event.clientY);
+        const id = onCreate("note", {
+          x: position.x - 140,
+          y: position.y - 95,
+        });
+        onSelect(id);
+      }}
       onWheel={handleWheel}
-      onDoubleClick={handleDoubleClick}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("application/x-libreta-item")) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }
+      }}
+      onDrop={(event) => {
+        const kind = event.dataTransfer.getData(
+          "application/x-libreta-item",
+        ) as ItemKind;
+        if (!["note", "text", "checklist"].includes(kind)) return;
+        event.preventDefault();
+        const position = toWorld(event.clientX, event.clientY);
+        const id = onCreate(kind, {
+          x: position.x - 140,
+          y: position.y - 80,
+        });
+        onSelect(id);
+        onModeChange("select");
+      }}
       style={{
-        backgroundPosition: `${camera.x}px ${camera.y}px`,
-        backgroundSize: `${24 * camera.zoom}px ${24 * camera.zoom}px`,
+        backgroundPosition: `${liveCamera.x}px ${liveCamera.y}px`,
+        backgroundSize: `${24 * liveCamera.zoom}px ${24 * liveCamera.zoom}px`,
       }}
     >
       <div
         className="canvas-world"
         style={{
-          transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`,
+          transform: `translate3d(${liveCamera.x}px, ${liveCamera.y}px, 0) scale(${liveCamera.zoom})`,
         }}
       >
-        <svg className="connection-layer" width="10000" height="10000">
-          {links.map((link) => {
-            const from = byId.get(link.fromId);
-            const to = byId.get(link.toId);
-            if (!from || !to) return null;
-
-            return (
-              <line
-                key={link.id}
-                x1={from.x + from.width / 2}
-                y1={from.y + from.height / 2}
-                x2={to.x + to.width / 2}
-                y2={to.y + to.height / 2}
-                onDoubleClick={(event) => {
-                  event.stopPropagation();
-                  onDeleteLink(link.id);
-                }}
-              />
-            );
-          })}
-        </svg>
-        {drawing.length > 1 ? (
-          <svg className="drawing-preview" width="10000" height="10000">
-            <path
-              d={drawing
-                .map(
-                  (point, index) =>
-                    `${index ? "L" : "M"} ${point.x} ${point.y}`,
-                )
-                .join(" ")}
-            />
-          </svg>
-        ) : null}
-        {draft ? (
-          <div
-            className={`shape-draft object-${draft.kind}`}
-            style={{
-              transform: `translate(${draft.x}px, ${draft.y}px)`,
-              width: draft.width,
-              height: draft.height,
-            }}
-          />
-        ) : null}
-        {objects.map((object) => (
+        {items.map((item) => (
           <ObjectCard
-            key={object.id}
-            object={object}
-            zoom={camera.zoom}
-            selected={selectedId === object.id}
-            linking={activeTool === "connect"}
-            onSelect={() =>
-              activeTool === "connect"
-                ? onLinkObject(object.id)
-                : onSelect(object.id)
-            }
-            onMove={(x, y) => onMove(object.id, x, y)}
-            onResize={(width, height) =>
-              onResize(object.id, width, height)
-            }
-            onUpdate={(changes) => onUpdate(object.id, changes)}
+            key={item.id}
+            item={item}
+            zoom={liveCamera.zoom}
+            selected={selectedId === item.id}
+            onSelect={() => onSelect(item.id)}
+            onMove={(x, y) => onUpdate(item.id, { x, y })}
+            onResize={(width, height) => onUpdate(item.id, { width, height })}
+            onUpdate={(changes) => onUpdate(item.id, changes)}
+            onDuplicate={() => onSelect(onDuplicate(item.id))}
+            onDelete={() => {
+              onDelete(item.id);
+              onSelect(null);
+            }}
           />
         ))}
       </div>
-      {!objects.length ? (
+
+      {!items.length ? (
         <div className="canvas-empty">
-          <strong>Construye tu sistema</strong>
+          <div className="empty-icon">
+            <Icon name="note" size={24} />
+          </div>
+          <strong>Este lienzo está vacío</strong>
           <span>
-            Crea un objeto o haz doble clic en cualquier parte del lienzo.
+            Crea algo con la barra inferior o haz doble clic en el lienzo.
           </span>
+          <button type="button" onClick={() => createAtCenter("note")}>
+            <Icon name="plus" size={16} />
+            Crear mi primera nota
+          </button>
         </div>
       ) : null}
+
+      <CanvasToolbar
+        mode={mode}
+        onModeChange={onModeChange}
+        onCreate={createAtCenter}
+      />
       <div className="canvas-controls">
-        <span>{Math.round(camera.zoom * 100)}%</span>
-        <button type="button" onClick={() => updateCamera(INITIAL_CAMERA)}>
-          Centrar
+        <button
+          type="button"
+          onClick={() => zoomAtCenter(0.85)}
+          aria-label="Alejar"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="zoom-value"
+          onClick={() => setCamera(DEFAULT_CAMERA)}
+          title="Restablecer vista"
+        >
+          {Math.round(liveCamera.zoom * 100)}%
+        </button>
+        <button
+          type="button"
+          onClick={() => zoomAtCenter(1.15)}
+          aria-label="Acercar"
+        >
+          +
         </button>
       </div>
-      <CanvasToolbar activeTool={activeTool} onChange={onToolChange} />
     </section>
   );
 }

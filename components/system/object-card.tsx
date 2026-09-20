@@ -1,56 +1,62 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import type { WorkspaceObject } from "@/lib/workspace/types";
+import { Icon } from "@/components/system/icon";
+import type {
+  CanvasItem,
+  ChecklistEntry,
+  ItemColor,
+} from "@/lib/workspace/types";
 
 type ObjectCardProps = {
-  object: WorkspaceObject;
+  item: CanvasItem;
   zoom: number;
   selected: boolean;
-  linking: boolean;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
-  onUpdate: (changes: Partial<WorkspaceObject>) => void;
+  onUpdate: (changes: Partial<CanvasItem>) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
 };
 
-const STATUS_LABELS = {
-  inbox: "Entrada",
-  active: "Activo",
-  waiting: "En espera",
-  done: "Hecho",
-};
+const COLORS: ItemColor[] = [
+  "white",
+  "sand",
+  "yellow",
+  "blue",
+  "green",
+  "rose",
+];
 
 export const ObjectCard = memo(function ObjectCard({
-  object,
+  item,
   zoom,
   selected,
-  linking,
   onSelect,
   onMove,
   onResize,
   onUpdate,
+  onDuplicate,
+  onDelete,
 }: ObjectCardProps) {
-  const [position, setPosition] = useState({ x: object.x, y: object.y });
+  const [position, setPosition] = useState({ x: item.x, y: item.y });
   const positionRef = useRef(position);
 
   useEffect(() => {
-    const next = { x: object.x, y: object.y };
+    const next = { x: item.x, y: item.y };
     positionRef.current = next;
     setPosition(next);
-  }, [object.x, object.y]);
+  }, [item.x, item.y]);
 
   const startDrag = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || linking) {
-      return;
-    }
-
+    if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect();
+
     const start = { x: event.clientX, y: event.clientY };
     const origin = positionRef.current;
-
     const move = (moveEvent: PointerEvent) => {
       const next = {
         x: origin.x + (moveEvent.clientX - start.x) / zoom,
@@ -59,7 +65,6 @@ export const ObjectCard = memo(function ObjectCard({
       positionRef.current = next;
       setPosition(next);
     };
-
     const stop = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
@@ -70,35 +75,15 @@ export const ObjectCard = memo(function ObjectCard({
     window.addEventListener("pointerup", stop, { once: true });
   };
 
-  if (object.kind === "drawing") {
-    const path = object.points
-      .map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`)
-      .join(" ");
-
-    return (
-      <svg className="drawing-object" width="10000" height="10000">
-        <path
-          d={path}
-          fill="none"
-          stroke={object.strokeColor}
-          strokeWidth={object.strokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
   const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
     const start = { x: event.clientX, y: event.clientY };
-    const origin = { width: object.width, height: object.height };
-
+    const origin = { width: item.width, height: item.height };
     const move = (moveEvent: PointerEvent) => {
       onResize(
-        Math.max(80, origin.width + (moveEvent.clientX - start.x) / zoom),
-        Math.max(50, origin.height + (moveEvent.clientY - start.y) / zoom),
+        Math.max(180, origin.width + (moveEvent.clientX - start.x) / zoom),
+        Math.max(70, origin.height + (moveEvent.clientY - start.y) / zoom),
       );
     };
     const stop = () => {
@@ -109,131 +94,183 @@ export const ObjectCard = memo(function ObjectCard({
     window.addEventListener("pointerup", stop, { once: true });
   };
 
-  const shape =
-    object.kind === "rectangle" || object.kind === "ellipse";
+  const updateChecklist = (entry: ChecklistEntry) => {
+    onUpdate({
+      checklist: item.checklist.map((candidate) =>
+        candidate.id === entry.id ? entry : candidate,
+      ),
+    });
+  };
 
   return (
     <article
-      className={`object-card object-${object.kind} ${
+      className={`canvas-item item-${item.kind} color-${item.color} ${
         selected ? "is-selected" : ""
-      } ${
-        linking ? "is-linking" : ""
       }`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
-        width: object.width,
-        minHeight: object.height,
-        background: object.color,
+        width: item.width,
+        height: item.height,
       }}
       onPointerDown={(event) => {
         event.stopPropagation();
         onSelect();
       }}
     >
-      <header onPointerDown={startDrag}>
-        <span className={`status-dot status-${object.status}`} />
-        <span>
-          {object.kind === "page"
-            ? "Página"
-            : object.kind === "database"
-              ? "Base de datos"
-              : object.kind === "note"
-                ? "Nota"
-                : object.kind === "text"
-                  ? "Texto"
-                  : shape
-                    ? "Figura"
-                    : STATUS_LABELS[object.status]}
-        </span>
-        <span className="drag-handle">⠿</span>
-      </header>
-      <div className="object-card-body">
-        {object.kind === "database" ? (
-          <>
-            <input
-              className="object-title-input"
-              value={object.title}
-              onChange={(event) => onUpdate({ title: event.target.value })}
-            />
-            <div className="mini-database">
-              {object.databaseRows.map((row) => (
-                <div key={row.id}>
-                  <input
-                    value={row.title}
-                    onChange={(event) =>
-                      onUpdate({
-                        databaseRows: object.databaseRows.map((item) =>
-                          item.id === row.id
-                            ? { ...item, title: event.target.value }
-                            : item,
-                        ),
-                      })
-                    }
-                  />
-                  <span>{STATUS_LABELS[row.status]}</span>
-                </div>
-              ))}
+      {selected ? (
+        <div
+          className="item-actions"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <div className="item-colors">
+            {COLORS.map((color) => (
               <button
+                key={color}
                 type="button"
-                onClick={() =>
-                  onUpdate({
-                    databaseRows: [
-                      ...object.databaseRows,
-                      {
-                        id: crypto.randomUUID(),
-                        title: "Nuevo registro",
-                        status: "inbox",
-                        value: "",
-                      },
-                    ],
-                  })
-                }
-              >
-                + Registro
-              </button>
-            </div>
-          </>
-        ) : shape ? (
-          <input
-            className="shape-label"
-            value={object.title}
-            placeholder="Etiqueta"
-            onChange={(event) => onUpdate({ title: event.target.value })}
+                className={`color-${color} ${
+                  item.color === color ? "is-active" : ""
+                }`}
+                onClick={() => onUpdate({ color })}
+                aria-label={`Color ${color}`}
+              />
+            ))}
+          </div>
+          <span />
+          <button type="button" onClick={onDuplicate} title="Duplicar">
+            <Icon name="copy" size={16} />
+          </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={onDelete}
+            title="Eliminar"
+          >
+            <Icon name="trash" size={16} />
+          </button>
+        </div>
+      ) : null}
+
+      <div className="item-drag-area" onPointerDown={startDrag} />
+      <div className="item-content">
+        {item.kind === "text" ? (
+          <textarea
+            className="text-content"
+            value={item.content}
+            placeholder="Escribe algo…"
+            onPointerDown={(event) => event.stopPropagation()}
+            onChange={(event) => onUpdate({ content: event.target.value })}
           />
         ) : (
           <>
             <input
-              className="object-title-input"
-              value={object.title}
+              className="item-title"
+              value={item.title}
+              placeholder={
+                item.kind === "checklist" ? "Título de la lista" : "Título"
+              }
+              onPointerDown={(event) => event.stopPropagation()}
               onChange={(event) => onUpdate({ title: event.target.value })}
             />
-            {object.kind !== "text" ? (
+            {item.kind === "note" ? (
               <textarea
-                className="object-description-input"
-                value={object.description}
-                placeholder={
-                  object.kind === "page"
-                    ? "Empieza a escribir tu documento…"
-                    : "Escribe aquí…"
-                }
-                onChange={(event) =>
-                  onUpdate({ description: event.target.value })
-                }
+                className="note-content"
+                value={item.content}
+                placeholder="Escribe aquí…"
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ content: event.target.value })}
               />
-            ) : null}
-            <div className="object-meta">
-              {object.person ? <span>◎ {object.person}</span> : null}
-              {object.endDate ? <span>◷ {object.endDate}</span> : null}
-            </div>
+            ) : (
+              <div className="checklist">
+                {item.checklist.map((entry) => (
+                  <div className="checklist-row" key={entry.id}>
+                    <button
+                      type="button"
+                      className={entry.checked ? "is-checked" : ""}
+                      onClick={() =>
+                        updateChecklist({ ...entry, checked: !entry.checked })
+                      }
+                      aria-label={
+                        entry.checked
+                          ? "Marcar como pendiente"
+                          : "Marcar como completado"
+                      }
+                    >
+                      {entry.checked ? <Icon name="check" size={13} /> : null}
+                    </button>
+                    <input
+                      value={entry.text}
+                      className={entry.checked ? "is-checked" : ""}
+                      placeholder="Nueva tarea"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onChange={(event) =>
+                        updateChecklist({ ...entry, text: event.target.value })
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          onUpdate({
+                            checklist: [
+                              ...item.checklist,
+                              {
+                                id: crypto.randomUUID(),
+                                text: "",
+                                checked: false,
+                              },
+                            ],
+                          });
+                        }
+                      }}
+                    />
+                    {item.checklist.length > 1 ? (
+                      <button
+                        type="button"
+                        className="checklist-remove"
+                        onClick={() =>
+                          onUpdate({
+                            checklist: item.checklist.filter(
+                              (candidate) => candidate.id !== entry.id,
+                            ),
+                          })
+                        }
+                        aria-label="Quitar tarea"
+                      >
+                        <Icon name="close" size={13} />
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="checklist-add"
+                  onClick={() =>
+                    onUpdate({
+                      checklist: [
+                        ...item.checklist,
+                        {
+                          id: crypto.randomUUID(),
+                          text: "",
+                          checked: false,
+                        },
+                      ],
+                    })
+                  }
+                >
+                  <Icon name="plus" size={14} />
+                  Añadir
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
-      <button
-        type="button"
-        className="resize-handle"
-        onPointerDown={startResize}
-        aria-label="Redimensionar"
-      />
+      {selected ? (
+        <button
+          type="button"
+          className="resize-handle"
+          onPointerDown={startResize}
+          aria-label="Redimensionar"
+        />
+      ) : null}
     </article>
   );
 });

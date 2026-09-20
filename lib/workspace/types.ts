@@ -1,90 +1,46 @@
-export type WorkspaceView = "canvas" | "records";
-export type ObjectStatus = "inbox" | "active" | "waiting" | "done";
-export type CanvasTool =
-  | "select"
-  | "hand"
-  | "draw"
-  | "rectangle"
-  | "ellipse"
-  | "text"
-  | "note"
-  | "page"
-  | "database"
-  | "connect";
-export type ObjectKind =
-  | "card"
-  | "note"
-  | "text"
-  | "rectangle"
-  | "ellipse"
-  | "page"
-  | "database"
-  | "drawing";
+export type ItemKind = "note" | "text" | "checklist";
+export type CanvasMode = "select" | "hand";
+export type ItemColor = "white" | "sand" | "yellow" | "blue" | "green" | "rose";
 
-export type DrawingPoint = {
-  x: number;
-  y: number;
-};
-
-export type DatabaseRow = {
+export type ChecklistEntry = {
   id: string;
-  title: string;
-  status: ObjectStatus;
-  value: string;
+  text: string;
+  checked: boolean;
 };
 
-export type WorkspaceSpace = {
+export type WorkspaceCanvas = {
   id: string;
   name: string;
-  view: WorkspaceView;
-  createdAt: number;
-};
-
-export type CustomProperty = {
-  id: string;
-  name: string;
-  value: string;
-};
-
-export type WorkspaceObject = {
-  id: string;
-  spaceId: string;
-  kind: ObjectKind;
-  title: string;
-  description: string;
-  status: ObjectStatus;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  startDate: string;
-  endDate: string;
-  reminder: string;
-  recurrence: string;
-  person: string;
-  tags: string[];
-  properties: CustomProperty[];
-  points: DrawingPoint[];
-  databaseRows: DatabaseRow[];
-  strokeColor: string;
-  strokeWidth: number;
   createdAt: number;
   updatedAt: number;
 };
 
-export type WorkspaceLink = {
+export type CanvasItem = {
   id: string;
-  spaceId: string;
-  fromId: string;
-  toId: string;
-  label: string;
+  canvasId: string;
+  kind: ItemKind;
+  title: string;
+  content: string;
+  checklist: ChecklistEntry[];
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: ItemColor;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type CanvasCamera = {
+  x: number;
+  y: number;
+  zoom: number;
 };
 
 export type WorkspaceState = {
-  version: 1;
-  spaces: WorkspaceSpace[];
-  objects: WorkspaceObject[];
-  links: WorkspaceLink[];
-  activeSpaceId: string;
+  version: 2;
+  canvases: WorkspaceCanvas[];
+  items: CanvasItem[];
+  cameras: Record<string, CanvasCamera>;
+  activeCanvasId: string;
 };

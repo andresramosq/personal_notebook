@@ -1,44 +1,71 @@
 "use client";
 
-import type { CanvasTool } from "@/lib/workspace/types";
+import { Icon } from "@/components/system/icon";
+import type { CanvasMode, ItemKind } from "@/lib/workspace/types";
 
 type CanvasToolbarProps = {
-  activeTool: CanvasTool;
-  onChange: (tool: CanvasTool) => void;
+  mode: CanvasMode;
+  onModeChange: (mode: CanvasMode) => void;
+  onCreate: (kind: ItemKind) => void;
 };
 
-const TOOLS: Array<{ id: CanvasTool; icon: string; label: string; key: string }> =
-  [
-    { id: "select", icon: "↖", label: "Seleccionar", key: "V" },
-    { id: "hand", icon: "✋", label: "Mover lienzo", key: "H" },
-    { id: "draw", icon: "✎", label: "Dibujar", key: "D" },
-    { id: "rectangle", icon: "□", label: "Rectángulo", key: "R" },
-    { id: "ellipse", icon: "○", label: "Elipse", key: "O" },
-    { id: "text", icon: "T", label: "Texto", key: "T" },
-    { id: "note", icon: "▤", label: "Nota", key: "N" },
-    { id: "page", icon: "▱", label: "Página", key: "P" },
-    { id: "database", icon: "▦", label: "Base de datos", key: "B" },
-    { id: "connect", icon: "↗", label: "Conectar", key: "C" },
+export function CanvasToolbar({
+  mode,
+  onModeChange,
+  onCreate,
+}: CanvasToolbarProps) {
+  const createTools: Array<{
+    kind: ItemKind;
+    icon: "note" | "text" | "check";
+    label: string;
+  }> = [
+    { kind: "note", icon: "note", label: "Nota" },
+    { kind: "text", icon: "text", label: "Texto" },
+    { kind: "checklist", icon: "check", label: "Lista" },
   ];
 
-export function CanvasToolbar({
-  activeTool,
-  onChange,
-}: CanvasToolbarProps) {
   return (
-    <div className="creative-toolbar" aria-label="Herramientas del lienzo">
-      {TOOLS.map((tool) => (
+    <div className="canvas-toolbar" aria-label="Herramientas del lienzo">
+      <div className="toolbar-group">
         <button
-          key={tool.id}
           type="button"
-          className={activeTool === tool.id ? "is-active" : ""}
-          onClick={() => onChange(tool.id)}
-          title={`${tool.label} (${tool.key})`}
+          className={mode === "select" ? "is-active" : ""}
+          onClick={() => onModeChange("select")}
+          title="Seleccionar (V)"
         >
-          <span>{tool.icon}</span>
-          <small>{tool.key}</small>
+          <Icon name="select" />
         </button>
-      ))}
+        <button
+          type="button"
+          className={mode === "hand" ? "is-active" : ""}
+          onClick={() => onModeChange("hand")}
+          title="Mover lienzo (H)"
+        >
+          <Icon name="hand" />
+        </button>
+      </div>
+      <span className="toolbar-divider" />
+      <div className="toolbar-group">
+        {createTools.map((tool) => (
+          <button
+            key={tool.kind}
+            type="button"
+            draggable
+            onClick={() => onCreate(tool.kind)}
+            onDragStart={(event) => {
+              event.dataTransfer.setData(
+                "application/x-libreta-item",
+                tool.kind,
+              );
+              event.dataTransfer.effectAllowed = "copy";
+            }}
+            title={`${tool.label} · clic o arrastra al lienzo`}
+          >
+            <Icon name={tool.icon} />
+            <span>{tool.label}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

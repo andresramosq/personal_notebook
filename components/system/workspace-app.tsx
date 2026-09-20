@@ -1,229 +1,118 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
-import { ObjectInspector } from "@/components/system/object-inspector";
-import { RecordsView } from "@/components/system/records-view";
+import { Icon } from "@/components/system/icon";
 import { WorkspaceSidebar } from "@/components/system/workspace-sidebar";
 import { useWorkspace } from "@/hooks/use-workspace";
-import type {
-  CanvasTool,
-  DrawingPoint,
-  ObjectKind,
-} from "@/lib/workspace/types";
+import type { CanvasMode } from "@/lib/workspace/types";
 
 export function WorkspaceApp() {
   const workspace = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
-  const [activeTool, setActiveTool] = useState<CanvasTool>("select");
-  const [query, setQuery] = useState("");
-
-  const selected = workspace.objects.find(
-    (object) => object.id === selectedId,
-  );
-
-  const visibleObjects = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return workspace.objects;
-
-    return workspace.objects.filter((object) =>
-      [
-        object.title,
-        object.description,
-        object.person,
-        object.tags.join(" "),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized),
-    );
-  }, [query, workspace.objects]);
+  const [mode, setMode] = useState<CanvasMode>("select");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    const shortcuts: Record<string, CanvasTool> = {
-      v: "select",
-      h: "hand",
-      d: "draw",
-      r: "rectangle",
-      o: "ellipse",
-      t: "text",
-      n: "note",
-      p: "page",
-      b: "database",
-      c: "connect",
-    };
-    const handler = (event: KeyboardEvent) => {
-      if (
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const editing =
         event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        event.target instanceof HTMLSelectElement
-      )
-        return;
-      const tool = shortcuts[event.key.toLowerCase()];
-      if (tool) setActiveTool(tool);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+        event.target instanceof HTMLTextAreaElement;
 
-  if (!workspace.state || !workspace.activeSpace) {
-    return <main className="system-loading">Preparando tu espacio…</main>;
+      if (!editing && event.key.toLowerCase() === "v") setMode("select");
+      if (!editing && event.key.toLowerCase() === "h") setMode("hand");
+      if (event.key === "Escape") {
+        setSelectedId(null);
+        setMode("select");
+      }
+      if (
+        !editing &&
+        selectedId &&
+        (event.key === "Delete" || event.key === "Backspace")
+      ) {
+        workspace.deleteItem(selectedId);
+        setSelectedId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedId, workspace]);
+
+  if (!workspace.state || !workspace.activeCanvas) {
+    return <main className="system-loading">Abriendo Libreta…</main>;
   }
 
-  const createObject = (
-    position?: { x: number; y: number },
-    kind: ObjectKind = "card",
-    size?: { width: number; height: number },
-    points?: DrawingPoint[],
-  ) => {
-    const id = workspace.createObject(position, kind, size, points);
-    setSelectedId(id);
+  const camera = workspace.state.cameras[workspace.activeCanvas.id] ?? {
+    x: 0,
+    y: 0,
+    zoom: 1,
   };
 
   return (
     <main className="system-shell">
       <WorkspaceSidebar
-        spaces={workspace.state.spaces}
-        activeId={workspace.state.activeSpaceId}
+        canvases={workspace.state.canvases}
+        activeId={workspace.activeCanvas.id}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         onSelect={(id) => {
           setSelectedId(null);
-          setLinkSourceId(null);
-          workspace.setActiveSpace(id);
+          workspace.setActiveCanvas(id);
         }}
         onCreate={() => {
           setSelectedId(null);
-          setLinkSourceId(null);
-          workspace.createSpace();
+          workspace.createCanvas();
+        }}
+        onDuplicate={(id) => {
+          setSelectedId(null);
+          workspace.duplicateCanvas(id);
         }}
         onDelete={(id) => {
           setSelectedId(null);
-          setLinkSourceId(null);
-          workspace.deleteSpace(id);
+          workspace.deleteCanvas(id);
         }}
+        onExport={workspace.exportWorkspace}
       />
 
       <header className="system-header">
-        <input
-          className="space-title-input"
-          value={workspace.activeSpace.name}
-          onChange={(event) =>
-            workspace.updateSpace({ name: event.target.value })
-          }
-          aria-label="Nombre del espacio"
-        />
-        <div className="view-switcher">
-          <button
-            type="button"
-            className={
-              workspace.activeSpace.view === "canvas" ? "is-active" : ""
-            }
-            onClick={() => workspace.updateSpace({ view: "canvas" })}
-          >
-            Lienzo
-          </button>
-          <button
-            type="button"
-            className={
-              workspace.activeSpace.view === "records" ? "is-active" : ""
-            }
-            onClick={() => workspace.updateSpace({ view: "records" })}
-          >
-            Registros
-          </button>
-        </div>
-        <label className="search-box">
-          <span>⌕</span>
+        <button
+          type="button"
+          className="sidebar-toggle"
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Abrir lienzos"
+        >
+          <Icon name="menu" />
+        </button>
+        <div className="canvas-heading">
           <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar objetos"
+            value={workspace.activeCanvas.name}
+            onChange={(event) => workspace.renameCanvas(event.target.value)}
+            aria-label="Nombre del lienzo"
           />
-        </label>
-        <button
-          type="button"
-          className="header-action"
-          onClick={() => createObject(undefined, "card")}
-        >
-          + Objeto
-        </button>
-        <button
-          type="button"
-          className={`header-action secondary ${
-            activeTool === "connect" ? "is-active" : ""
-          }`}
-          disabled={!selectedId}
-          onClick={() => {
-            setLinkSourceId(selectedId);
-            setActiveTool("connect");
-          }}
-        >
-          Conectar
-        </button>
+          <span>{workspace.items.length} elementos</span>
+        </div>
+        <div className="save-status">
+          <span />
+          Guardado
+        </div>
       </header>
 
-      <section
-        className={`system-content ${selected ? "with-inspector" : ""}`}
-      >
-        {workspace.activeSpace.view === "canvas" ? (
-          <CanvasView
-            objects={visibleObjects}
-            links={workspace.links}
-            selectedId={selectedId}
-            activeTool={activeTool}
-            onToolChange={(tool) => {
-              setActiveTool(tool);
-              if (tool !== "connect") setLinkSourceId(null);
-              if (tool === "connect" && selectedId)
-                setLinkSourceId(selectedId);
-            }}
-            onSelect={setSelectedId}
-            onMove={(id, x, y) => workspace.updateObject(id, { x, y })}
-            onResize={(id, width, height) =>
-              workspace.updateObject(id, { width, height })
-            }
-            onUpdate={workspace.updateObject}
-            onCreate={createObject}
-            onLinkObject={(targetId) => {
-              if (!linkSourceId) {
-                setLinkSourceId(targetId);
-                setSelectedId(targetId);
-              } else if (targetId !== linkSourceId) {
-                workspace.createLink(linkSourceId, targetId);
-                setLinkSourceId(null);
-                setSelectedId(targetId);
-                setActiveTool("select");
-              }
-            }}
-            onDeleteLink={workspace.deleteLink}
-          />
-        ) : (
-          <RecordsView
-            objects={visibleObjects.filter(
-              (object) =>
-                !["drawing", "rectangle", "ellipse"].includes(object.kind),
-            )}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onUpdate={workspace.updateObject}
-            onCreate={() => createObject(undefined, "card")}
-          />
-        )}
-
-        {selected ? (
-          <ObjectInspector
-            object={selected}
-            onUpdate={(changes) =>
-              workspace.updateObject(selected.id, changes)
-            }
-            onDelete={() => {
-              workspace.deleteObject(selected.id);
-              setSelectedId(null);
-              setLinkSourceId(null);
-            }}
-            onClose={() => setSelectedId(null)}
-          />
-        ) : null}
+      <section className="system-content">
+        <CanvasView
+          key={workspace.activeCanvas.id}
+          items={workspace.items}
+          camera={camera}
+          selectedId={selectedId}
+          mode={mode}
+          onModeChange={setMode}
+          onCameraChange={workspace.updateCamera}
+          onSelect={setSelectedId}
+          onCreate={workspace.createItem}
+          onUpdate={workspace.updateItem}
+          onDuplicate={workspace.duplicateItem}
+          onDelete={workspace.deleteItem}
+        />
       </section>
     </main>
   );
