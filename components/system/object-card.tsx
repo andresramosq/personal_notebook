@@ -16,6 +16,7 @@ type ObjectCardProps = {
   onUpdate: (changes: Partial<CanvasItem>) => void;
   onDelete: () => void;
   onEnterBoard: () => void;
+  onOpenDatabase: () => void;
 };
 
 const COLORS: ItemColor[] = [
@@ -39,6 +40,7 @@ export const ObjectCard = memo(function ObjectCard({
   onUpdate,
   onDelete,
   onEnterBoard,
+  onOpenDatabase,
 }: ObjectCardProps) {
   const [position, setPosition] = useState({ x: item.x, y: item.y });
   const positionRef = useRef(position);
@@ -111,6 +113,7 @@ export const ObjectCard = memo(function ObjectCard({
       onDoubleClick={(event) => {
         event.stopPropagation();
         if (item.kind === "board") onEnterBoard();
+        if (item.kind === "database") onOpenDatabase();
       }}
     >
       {selected ? (
@@ -273,6 +276,44 @@ export const ObjectCard = memo(function ObjectCard({
             )}
           </>
         ) : null}
+
+        {item.kind === "database" ? (
+          <>
+            <div className="database-card-header">
+              <Icon name="database" size={15} />
+              <input
+                className="item-title"
+                value={item.title}
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ title: event.target.value })}
+              />
+            </div>
+            <div className="database-card-preview">
+              <div className="database-preview-heading">
+                {item.databaseFields.slice(0, 2).map((field) => (
+                  <span key={field.id}>{field.name}</span>
+                ))}
+              </div>
+              {item.databaseRecords.slice(0, 3).map((record) => (
+                <div className="database-preview-row" key={record.id}>
+                  {item.databaseFields.slice(0, 2).map((field) => (
+                    <span key={field.id}>
+                      {formatPreviewValue(record.cells[field.id])}
+                    </span>
+                  ))}
+                </div>
+              ))}
+              {!item.databaseRecords.length ? (
+                <span className="database-preview-empty">
+                  Doble clic para añadir registros
+                </span>
+              ) : null}
+            </div>
+            <small className="database-card-count">
+              {item.databaseRecords.length} registros
+            </small>
+          </>
+        ) : null}
       </div>
 
       {selected ? (
@@ -286,3 +327,8 @@ export const ObjectCard = memo(function ObjectCard({
     </article>
   );
 });
+
+function formatPreviewValue(value: string | boolean | undefined) {
+  if (typeof value === "boolean") return value ? "✓" : "—";
+  return value || "—";
+}

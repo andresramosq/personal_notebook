@@ -125,6 +125,8 @@ function migrateFromV2(
       content: item.content ?? "",
       url: item.url ?? "",
       nestedCanvasId: item.nestedCanvasId ?? null,
+      databaseFields: item.databaseFields ?? [],
+      databaseRecords: item.databaseRecords ?? [],
       x: item.x ?? 120,
       y: item.y ?? 120,
       width: item.width ?? 280,
@@ -164,6 +166,8 @@ function migrateLegacyWorkspace(
       content: object.description ?? "",
       url: "",
       nestedCanvasId: null,
+      databaseFields: [],
+      databaseRecords: [],
       x: object.x ?? 120,
       y: object.y ?? 120,
       width: object.width ?? (object.kind === "text" ? 260 : 280),
@@ -278,6 +282,12 @@ function normalizeItem(
     content: item.content ?? "",
     url: item.url ?? "",
     nestedCanvasId,
+    databaseFields: Array.isArray(item.databaseFields)
+      ? item.databaseFields
+      : [],
+    databaseRecords: Array.isArray(item.databaseRecords)
+      ? item.databaseRecords
+      : [],
     x: typeof item.x === "number" ? item.x : 120,
     y: typeof item.y === "number" ? item.y : 120,
     width: typeof item.width === "number" ? item.width : defaultWidth(kind),
@@ -297,6 +307,7 @@ function migrateKind(kind?: string): ItemKind {
   if (kind === "board") return "board";
   if (kind === "link") return "link";
   if (kind === "image") return "image";
+  if (kind === "database") return "database";
   return "note";
 }
 
@@ -304,6 +315,7 @@ function defaultTitle(kind: ItemKind) {
   if (kind === "board") return "Pizarra anidada";
   if (kind === "link") return "Enlace";
   if (kind === "image") return "Imagen";
+  if (kind === "database") return "Base de datos";
   if (kind === "text") return "";
   return "Nueva nota";
 }
@@ -313,6 +325,7 @@ function defaultWidth(kind: ItemKind) {
   if (kind === "board") return 260;
   if (kind === "link") return 240;
   if (kind === "image") return 220;
+  if (kind === "database") return 420;
   return 280;
 }
 
@@ -321,6 +334,7 @@ function defaultHeight(kind: ItemKind) {
   if (kind === "board") return 180;
   if (kind === "link") return 110;
   if (kind === "image") return 160;
+  if (kind === "database") return 240;
   return 200;
 }
 

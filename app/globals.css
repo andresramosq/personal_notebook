@@ -732,6 +732,245 @@ button {
   box-shadow: 0 4px 16px rgb(0 0 0 / 8%);
 }
 
+.database-card-header,
+.database-card-preview {
+  min-height: 0;
+}
+
+.database-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+
+.database-card-preview {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid rgb(0 0 0 / 8%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 55%);
+  padding: 8px;
+  overflow: hidden;
+}
+
+.database-preview-heading,
+.database-preview-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.database-preview-heading {
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+.database-preview-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.database-preview-empty {
+  margin: auto;
+  color: var(--faint);
+  font-size: 11px;
+  text-align: center;
+}
+
+.database-card-count {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.database-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: rgb(20 20 18 / 28%);
+  padding: 24px;
+}
+
+.database-view {
+  display: flex;
+  width: min(1100px, 96vw);
+  max-height: min(760px, 92vh);
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 24px 60px rgb(20 20 18 / 18%);
+  overflow: hidden;
+}
+
+.database-view-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 16px 18px;
+}
+
+.database-view-title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+}
+
+.database-view-title input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.database-view-header > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.database-view-header > button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.database-actions {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px 0;
+}
+
+.database-actions button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.database-actions button.primary {
+  border-color: #2d2d2a;
+  background: #2d2d2a;
+  color: white;
+}
+
+.database-table-wrap {
+  min-height: 0;
+  flex: 1;
+  margin: 14px 18px 18px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.database-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.database-table th,
+.database-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  vertical-align: top;
+  font-size: 12px;
+}
+
+.database-table th {
+  background: #f7f7f4;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.database-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 24px;
+  gap: 6px;
+  align-items: center;
+}
+
+.database-field input,
+.database-field select,
+.database-table td input,
+.database-table td select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.database-field button,
+.database-row-actions button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.database-options-input {
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.database-row-actions {
+  width: 42px;
+}
+
+.database-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 40px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+
+.database-empty button {
+  align-self: center;
+  border: 0;
+  border-radius: 8px;
+  background: #2d2d2a;
+  padding: 8px 12px;
+  color: white;
+  font-size: 12px;
+}
+
 @media (max-width: 760px) {
   .system-shell {
     grid-template:

@@ -8,6 +8,9 @@ import type {
   CanvasCamera,
   CanvasItem,
   CanvasLink,
+  DatabaseField,
+  DatabaseFieldType,
+  DatabaseRecord,
   ItemColor,
   ItemKind,
   WorkspaceCanvas,
@@ -70,6 +73,30 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS canvas_items_canvas_id
     ON canvas_items(canvas_id);
 
+  CREATE TABLE IF NOT EXISTS database_fields (
+    id TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL REFERENCES canvas_items(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    options_json TEXT NOT NULL,
+    position INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS database_records (
+    id TEXT PRIMARY KEY,
+    item_id TEXT NOT NULL REFERENCES canvas_items(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS database_cells (
+    record_id TEXT NOT NULL REFERENCES database_records(id) ON DELETE CASCADE,
+    field_id TEXT NOT NULL REFERENCES database_fields(id) ON DELETE CASCADE,
+    value TEXT NOT NULL,
+    PRIMARY KEY (record_id, field_id)
+  );
+
   CREATE TABLE IF NOT EXISTS canvas_links (
     id TEXT PRIMARY KEY,
     canvas_id TEXT NOT NULL REFERENCES canvases(id) ON DELETE CASCADE,
@@ -127,6 +154,29 @@ type CameraRow = {
   zoom: number;
 };
 
+type DatabaseFieldRow = {
+  id: string;
+  item_id: string;
+  name: string;
+  type: DatabaseFieldType;
+  options_json: string;
+  position: number;
+};
+
+type DatabaseRecordRow = {
+  id: string;
+  item_id: string;
+  position: number;
+  created_at: number;
+  updated_at: number;
+};
+
+type DatabaseCellRow = {
+  record_id: string;
+  field_id: string;
+  value: string;
+};
+
 export function readWorkspace(): {
   state: WorkspaceState;
   isNew: boolean;
@@ -157,6 +207,8 @@ export function readWorkspace(): {
     content: row.content,
     url: row.url,
     nestedCanvasId: row.nested_canvas_id,
+    databaseFields: [],
+    databaseRecords: [],
     x: row.x,
     y: row.y,
     width: row.width,
@@ -165,6 +217,62 @@ export function readWorkspace(): {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }));
+
+  const databaseFields = (
+    db
+      .prepare("SELECT * FROM database_fields ORDER BY position")
+      .all() as DatabaseFieldRow[]
+  ).map(
+    (row): DatabaseField & { itemId: string } => ({
+      id: row.id,
+      itemId: row.item_id,
+      name: row.name,
+      type: row.type,
+      options: JSON.parse(row.options_json) as string[],
+    }),
+  );
+  const fieldsById = new Map(databaseFields.map((field) => [field.id, field]));
+  const cellsByRecord = new Map<string, Record<string, string | boolean>>();
+  const cellRows = db
+    .prepare("SELECT * FROM database_cells")
+    .all() as DatabaseCellRow[];
+
+  for (const cell of cellRows) {
+    const field = fieldsById.get(cell.field_id);
+    const cells = cellsByRecord.get(cell.record_id) ?? {};
+    cells[cell.field_id] =
+      field?.type === "checkbox" ? cell.value === "1" : cell.value;
+    cellsByRecord.set(cell.record_id, cells);
+  }
+
+  const databaseRecords = (
+    db
+      .prepare("SELECT * FROM database_records ORDER BY position")
+      .all() as DatabaseRecordRow[]
+  ).map(
+    (row): DatabaseRecord & { itemId: string } => ({
+      id: row.id,
+      itemId: row.item_id,
+      cells: cellsByRecord.get(row.id) ?? {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }),
+  );
+
+  for (const item of items) {
+    item.databaseFields = databaseFields
+      .filter((field) => field.itemId === item.id)
+      .map(({ itemId, ...field }) => {
+        void itemId;
+        return field;
+      });
+    item.databaseRecords = databaseRecords
+      .filter((record) => record.itemId === item.id)
+      .map(({ itemId, ...record }) => {
+        void itemId;
+        return record;
+      });
+  }
 
   const links = (
     db.prepare("SELECT * FROM canvas_links").all() as LinkRow[]
@@ -208,6 +316,9 @@ export function readWorkspace(): {
 
 const persistWorkspace = db.transaction((state: WorkspaceState) => {
   db.prepare("DELETE FROM canvas_links").run();
+  db.prepare("DELETE FROM database_cells").run();
+  db.prepare("DELETE FROM database_records").run();
+  db.prepare("DELETE FROM database_fields").run();
   db.prepare("DELETE FROM canvas_items").run();
   db.prepare("DELETE FROM canvas_cameras").run();
   db.prepare("DELETE FROM canvases").run();
@@ -234,6 +345,49 @@ const persistWorkspace = db.transaction((state: WorkspaceState) => {
   `);
   for (const item of state.items) {
     insertItem.run(item);
+  }
+
+  const insertField = db.prepare(`
+    INSERT INTO database_fields (
+      id, item_id, name, type, options_json, position
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const insertRecord = db.prepare(`
+    INSERT INTO database_records (
+      id, item_id, position, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?)
+  `);
+  const insertCell = db.prepare(`
+    INSERT INTO database_cells (record_id, field_id, value)
+    VALUES (?, ?, ?)
+  `);
+  for (const item of state.items) {
+    item.databaseFields.forEach((field, position) => {
+      insertField.run(
+        field.id,
+        item.id,
+        field.name,
+        field.type,
+        JSON.stringify(field.options),
+        position,
+      );
+    });
+    item.databaseRecords.forEach((record, position) => {
+      insertRecord.run(
+        record.id,
+        item.id,
+        position,
+        record.createdAt,
+        record.updatedAt,
+      );
+      for (const [fieldId, value] of Object.entries(record.cells)) {
+        insertCell.run(
+          record.id,
+          fieldId,
+          typeof value === "boolean" ? (value ? "1" : "0") : value,
+        );
+      }
+    });
   }
 
   const insertLink = db.prepare(`

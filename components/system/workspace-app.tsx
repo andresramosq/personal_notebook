@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
+import { DatabaseView } from "@/components/system/database-view";
 import { Icon } from "@/components/system/icon";
 import { WorkspaceSidebar } from "@/components/system/workspace-sidebar";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -14,6 +15,7 @@ export function WorkspaceApp() {
   const [mode, setMode] = useState<CanvasMode>("select");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [openDatabaseId, setOpenDatabaseId] = useState<string | null>(null);
 
   const deleteItem = workspace.deleteItem;
   const resetWorkspace = workspace.resetWorkspace;
@@ -27,6 +29,10 @@ export function WorkspaceApp() {
       if (!editing && event.key.toLowerCase() === "v") setMode("select");
       if (!editing && event.key.toLowerCase() === "h") setMode("hand");
       if (event.key === "Escape") {
+        if (openDatabaseId) {
+          setOpenDatabaseId(null);
+          return;
+        }
         setSelectedId(null);
         setLinkSourceId(null);
         setMode("select");
@@ -43,7 +49,7 @@ export function WorkspaceApp() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteItem, selectedId]);
+  }, [deleteItem, openDatabaseId, selectedId]);
 
   const visibleItems = useMemo(() => {
     const value = query.trim().toLocaleLowerCase();
@@ -70,6 +76,10 @@ export function WorkspaceApp() {
       </main>
     );
   }
+
+  const openDatabase = workspace.items.find(
+    (item) => item.id === openDatabaseId && item.kind === "database",
+  );
 
   const camera = workspace.state.cameras[workspace.activeCanvas.id] ?? {
     x: 0,
@@ -189,12 +199,25 @@ export function WorkspaceApp() {
           onEnterBoard={(item) => {
             if (item.nestedCanvasId) {
               setSelectedId(null);
+              setOpenDatabaseId(null);
               workspace.enterCanvas(item.nestedCanvasId);
             }
+          }}
+          onOpenDatabase={(item) => {
+            setSelectedId(item.id);
+            setOpenDatabaseId(item.id);
           }}
           getNestedPreview={workspace.getNestedPreview}
         />
       </section>
+
+      {openDatabase ? (
+        <DatabaseView
+          item={openDatabase}
+          onUpdate={(changes) => workspace.updateItem(openDatabase.id, changes)}
+          onClose={() => setOpenDatabaseId(null)}
+        />
+      ) : null}
     </main>
   );
 }

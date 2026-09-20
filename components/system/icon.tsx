@@ -3,6 +3,7 @@ type IconName =
   | "chevron"
   | "close"
   | "copy"
+  | "database"
   | "hand"
   | "image"
   | "line"
@@ -34,6 +35,13 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <rect x="8" y="8" width="12" height="12" rx="2" />
       <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+    </>
+  ),
+  database: (
+    <>
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+      <path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
     </>
   ),
   hand: (

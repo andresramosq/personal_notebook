@@ -9,7 +9,14 @@ import type {
 
 const ELEMENTS: Array<{
   kind: PaletteKind;
-  icon: "note" | "text" | "image" | "link" | "board" | "line";
+  icon:
+    | "note"
+    | "text"
+    | "image"
+    | "link"
+    | "board"
+    | "database"
+    | "line";
   label: string;
 }> = [
   { kind: "note", icon: "note", label: "Nota" },
@@ -17,6 +24,7 @@ const ELEMENTS: Array<{
   { kind: "image", icon: "image", label: "Imagen" },
   { kind: "link", icon: "link", label: "Enlace" },
   { kind: "board", icon: "board", label: "Pizarra anidada" },
+  { kind: "database", icon: "database", label: "Base de datos" },
   { kind: "connect", icon: "line", label: "Línea" },
 ];
 

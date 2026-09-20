@@ -26,11 +26,19 @@ type CanvasViewProps = {
   onUpdate: (id: string, changes: Partial<CanvasItem>) => void;
   onDelete: (id: string) => void;
   onEnterBoard: (item: CanvasItem) => void;
+  onOpenDatabase: (item: CanvasItem) => void;
   getNestedPreview: (canvasId: string) => CanvasItem[];
 };
 
 const DEFAULT_CAMERA: CanvasCamera = { x: 0, y: 0, zoom: 1 };
-const ITEM_KINDS: ItemKind[] = ["note", "text", "image", "link", "board"];
+const ITEM_KINDS: ItemKind[] = [
+  "note",
+  "text",
+  "image",
+  "link",
+  "board",
+  "database",
+];
 
 export function CanvasView({
   items,
@@ -48,6 +56,7 @@ export function CanvasView({
   onUpdate,
   onDelete,
   onEnterBoard,
+  onOpenDatabase,
   getNestedPreview,
 }: CanvasViewProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -248,6 +257,7 @@ export function CanvasView({
               onSelect(null);
             }}
             onEnterBoard={() => onEnterBoard(item)}
+            onOpenDatabase={() => onOpenDatabase(item)}
           />
         ))}
       </div>

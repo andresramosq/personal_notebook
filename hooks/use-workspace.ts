@@ -264,6 +264,24 @@ export function useWorkspace() {
       content: kind === "text" ? "Escribe un texto" : "",
       url: kind === "link" ? "https://" : "",
       nestedCanvasId,
+      databaseFields:
+        kind === "database"
+          ? [
+              {
+                id: createId(),
+                name: "Nombre",
+                type: "text",
+                options: [],
+              },
+              {
+                id: createId(),
+                name: "Estado",
+                type: "select",
+                options: ["Pendiente", "En curso", "Listo"],
+              },
+            ]
+          : [],
+      databaseRecords: [],
       x: position.x,
       y: position.y,
       width: defaultItemWidth(kind),
@@ -417,6 +435,7 @@ function defaultItemTitle(kind: ItemKind) {
   if (kind === "board") return "Pizarra anidada";
   if (kind === "link") return "Enlace";
   if (kind === "image") return "Imagen";
+  if (kind === "database") return "Base de datos";
   if (kind === "text") return "";
   return "Nueva nota";
 }
@@ -426,6 +445,7 @@ function defaultItemWidth(kind: ItemKind) {
   if (kind === "board") return 260;
   if (kind === "link") return 240;
   if (kind === "image") return 220;
+  if (kind === "database") return 420;
   return 280;
 }
 
@@ -434,5 +454,6 @@ function defaultItemHeight(kind: ItemKind) {
   if (kind === "board") return 180;
   if (kind === "link") return 110;
   if (kind === "image") return 160;
+  if (kind === "database") return 240;
   return 200;
 }

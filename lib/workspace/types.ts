@@ -1,6 +1,34 @@
-export type ItemKind = "note" | "text" | "board" | "link" | "image";
+export type ItemKind =
+  | "note"
+  | "text"
+  | "board"
+  | "link"
+  | "image"
+  | "database";
 export type CanvasMode = "select" | "hand" | "connect";
 export type ItemColor = "white" | "sand" | "yellow" | "blue" | "green" | "rose";
+export type DatabaseFieldType =
+  | "text"
+  | "number"
+  | "date"
+  | "select"
+  | "checkbox";
+
+export type DatabaseField = {
+  id: string;
+  name: string;
+  type: DatabaseFieldType;
+  options: string[];
+};
+
+export type DatabaseCellValue = string | boolean;
+
+export type DatabaseRecord = {
+  id: string;
+  cells: Record<string, DatabaseCellValue>;
+  createdAt: number;
+  updatedAt: number;
+};
 
 export type WorkspaceCanvas = {
   id: string;
@@ -18,6 +46,8 @@ export type CanvasItem = {
   content: string;
   url: string;
   nestedCanvasId: string | null;
+  databaseFields: DatabaseField[];
+  databaseRecords: DatabaseRecord[];
   x: number;
   y: number;
   width: number;
