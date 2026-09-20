@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { CanvasToolbar } from "@/components/system/canvas-toolbar";
 import { Icon } from "@/components/system/icon";
 import { ObjectCard } from "@/components/system/object-card";
@@ -44,11 +44,6 @@ export function CanvasView({
   const cameraRef = useRef(camera);
   const [liveCamera, setLiveCamera] = useState(camera);
 
-  useEffect(() => {
-    cameraRef.current = camera;
-    setLiveCamera(camera);
-  }, [camera]);
-
   const setCamera = (next: CanvasCamera, persist = true) => {
     cameraRef.current = next;
     setLiveCamera(next);
@@ -80,7 +75,7 @@ export function CanvasView({
     onModeChange("select");
   };
 
-  const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
+  const startPan = (event: React.PointerEvent<HTMLElement>) => {
     const shouldPan = mode === "hand" || event.button === 1;
     if (!shouldPan || event.target !== event.currentTarget) return;
 
