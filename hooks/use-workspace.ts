@@ -21,6 +21,9 @@ export function useWorkspace() {
     "loading" | "saving" | "saved" | "error"
   >("loading");
   const hydratedRef = useRef(false);
+  const pendingSaveRef = useRef<WorkspaceState | null>(null);
+  const saveInFlightRef = useRef(false);
+  const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,29 +62,47 @@ export function useWorkspace() {
   useEffect(() => {
     if (!state || !hydratedRef.current) return;
 
-    saveWorkspace(state);
-    setPersistenceStatus("saving");
-    const controller = new AbortController();
-    const timeout = window.setTimeout(async () => {
+    const flushPendingSave = async () => {
+      if (saveInFlightRef.current) return;
+
+      saveInFlightRef.current = true;
       try {
-        const response = await fetch("/api/workspace", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(state),
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("Database save failed");
+        while (pendingSaveRef.current) {
+          const nextState = pendingSaveRef.current;
+          pendingSaveRef.current = null;
+          const response = await fetch("/api/workspace", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(nextState),
+          });
+          if (!response.ok) throw new Error("Database save failed");
+        }
         setPersistenceStatus("saved");
-      } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          setPersistenceStatus("error");
+      } catch {
+        setPersistenceStatus("error");
+      } finally {
+        saveInFlightRef.current = false;
+        if (pendingSaveRef.current) {
+          void flushPendingSave();
         }
       }
+    };
+
+    saveWorkspace(state);
+    pendingSaveRef.current = state;
+    setPersistenceStatus("saving");
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      void flushPendingSave();
     }, 350);
 
     return () => {
-      window.clearTimeout(timeout);
-      controller.abort();
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+      }
     };
   }, [state]);
 
