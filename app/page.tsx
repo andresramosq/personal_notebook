@@ -1,5 +1,5 @@
-import { ProductivityWorkspace } from "@/components/workspace/productivity-workspace";
+import { WorkspaceApp } from "@/components/system/workspace-app";
 
 export default function Home() {
-  return <ProductivityWorkspace />;
+  return <WorkspaceApp />;
 }
