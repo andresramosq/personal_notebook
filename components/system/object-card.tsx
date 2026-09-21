@@ -18,15 +18,13 @@ type ObjectCardProps = {
   item: CanvasItem;
   zoom: number;
   selected: boolean;
-  linking: boolean;
-  nestedPreview: CanvasItem[];
+  nestedPreview?: CanvasItem[];
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
   onUpdate: (changes: Partial<CanvasItem>) => void;
   onDelete: () => void;
   onEnterBoard: () => void;
-  onOpenDatabase: () => void;
   embedded?: boolean;
   onPrepareDrag?: (event: React.DragEvent<HTMLElement>) => void;
 };
@@ -44,18 +42,17 @@ export const ObjectCard = memo(function ObjectCard({
   item,
   zoom,
   selected,
-  linking,
-  nestedPreview,
+  nestedPreview = [],
   onSelect,
   onMove,
   onResize,
   onUpdate,
   onDelete,
   onEnterBoard,
-  onOpenDatabase,
   embedded = false,
   onPrepareDrag,
 }: ObjectCardProps) {
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [position, setPosition] = useState({ x: item.x, y: item.y });
   const positionRef = useRef(position);
   const [linkPreview, setLinkPreview] = useState<{
@@ -109,7 +106,7 @@ export const ObjectCard = memo(function ObjectCard({
   }, [item.x, item.y]);
 
   const startDrag = (event: React.PointerEvent<HTMLElement>) => {
-    if (embedded || event.button !== 0 || linking) return;
+    if (embedded || event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect();
@@ -157,7 +154,7 @@ export const ObjectCard = memo(function ObjectCard({
     <article
       className={`canvas-item item-${item.kind} color-${item.color} ${
         selected ? "is-selected" : ""
-      } ${linking ? "is-linking" : ""} ${
+      } ${
         item.kind === "line" || item.kind === "drawing" ? "item-stroke" : ""
       } ${embedded ? "canvas-item-embedded" : ""}`}
       style={
@@ -178,7 +175,6 @@ export const ObjectCard = memo(function ObjectCard({
       onDoubleClick={(event) => {
         event.stopPropagation();
         if (item.kind === "board") onEnterBoard();
-        if (item.kind === "database") onOpenDatabase();
       }}
     >
       {selected &&
@@ -213,17 +209,6 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
-      {linking &&
-      item.kind !== "drawing" &&
-      item.kind !== "line" ? (
-        <>
-          <span className="link-port link-port-n" />
-          <span className="link-port link-port-e" />
-          <span className="link-port link-port-s" />
-          <span className="link-port link-port-w" />
-        </>
-      ) : null}
-
       {selected && (item.kind === "drawing" || item.kind === "line") ? (
         <div
           className="item-actions drawing-actions"
@@ -242,28 +227,13 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
-      {linking &&
-      item.kind !== "drawing" &&
-      item.kind !== "line" ? (
-        <button
-          type="button"
-          className="link-target-overlay"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onSelect();
-          }}
-          aria-label={`Conectar ${item.title || "elemento"}`}
-        />
-      ) : null}
-
       {!embedded && item.kind !== "drawing" && item.kind !== "line" ? (
         <div className="item-drag-area" onPointerDown={startDrag} />
       ) : !embedded ? (
         <div
           className="drawing-drag-area"
           onPointerDown={(event) => {
-            if (event.button !== 0 || linking) return;
+            if (event.button !== 0) return;
             startDrag(event);
           }}
         />
@@ -343,11 +313,22 @@ export const ObjectCard = memo(function ObjectCard({
               onChange={(event) => onUpdate({ title: event.target.value })}
             />
             <textarea
+              ref={noteRef}
               className="note-content"
               value={item.content}
               placeholder="Escribe aquí…"
               onPointerDown={(event) => event.stopPropagation()}
-              onChange={(event) => onUpdate({ content: event.target.value })}
+              onChange={(event) => {
+                const content = event.target.value;
+                const nextHeight = Math.max(
+                  160,
+                  event.target.scrollHeight + 56,
+                );
+                onUpdate({
+                  content,
+                  height: nextHeight,
+                });
+              }}
             />
           </>
         ) : null}

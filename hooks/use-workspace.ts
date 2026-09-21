@@ -369,9 +369,7 @@ export function useWorkspace() {
       color:
         kind === "board"
           ? "sand"
-          : kind === "note"
-            ? "yellow"
-            : kind === "comment"
+          : kind === "comment"
               ? "sand"
               : kind === "kanban"
                 ? "blue"
@@ -410,7 +408,7 @@ export function useWorkspace() {
       nestedCanvasId: null,
       parentColumnId: null,
       sortOrder: 0,
-      inUnsorted: true,
+      inUnsorted: false,
       databaseFields: [],
       databaseRecords: [],
       points: [],
@@ -814,7 +812,7 @@ export function useWorkspace() {
 function defaultItemTitle(kind: ItemKind) {
   if (kind === "board") return "Nuevo tablero";
   if (kind === "link") return "Enlace";
-  if (kind === "image") return "Imagen";
+  if (kind === "image") return "";
   if (kind === "video") return "Video";
   if (kind === "file") return "Archivo";
   if (kind === "database") return "Base de datos";

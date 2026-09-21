@@ -4,77 +4,74 @@ import { useRef } from "react";
 import { Icon } from "@/components/system/icon";
 import type { CanvasMode, ItemKind, PaletteKind } from "@/lib/workspace/types";
 
+/** Orden y tipos iguales a la barra izquierda de Milanote */
 const TOOLS: Array<{
   kind: PaletteKind;
   icon:
     | "note"
-    | "link"
+    | "image"
     | "todo"
-    | "line"
+    | "link"
     | "kanban"
-    | "board"
     | "comment"
     | "database"
-    | "image"
+    | "board"
     | "upload"
     | "pen"
-    | "connect"
     | "trash";
   label: string;
   section?: "main" | "bottom";
 }> = [
   { kind: "note", icon: "note", label: "Nota", section: "main" },
-  { kind: "link", icon: "link", label: "Enlace", section: "main" },
+  { kind: "image", icon: "image", label: "Imagen", section: "main" },
   { kind: "todo", icon: "todo", label: "To-do", section: "main" },
+  { kind: "link", icon: "link", label: "Enlace", section: "main" },
   { kind: "column", icon: "kanban", label: "Columna", section: "main" },
-  { kind: "board", icon: "board", label: "Tablero", section: "main" },
   { kind: "comment", icon: "comment", label: "Comentario", section: "main" },
   { kind: "table", icon: "database", label: "Tabla", section: "main" },
   { kind: "video", icon: "image", label: "Video", section: "main" },
-  { kind: "line", icon: "line", label: "Línea", section: "bottom" },
-  { kind: "upload", icon: "upload", label: "Subir", section: "bottom" },
-  { kind: "draw", icon: "pen", label: "Dibujar", section: "bottom" },
-  { kind: "connect", icon: "connect", label: "Unir", section: "bottom" },
+  { kind: "draw", icon: "pen", label: "Boceto", section: "main" },
+  { kind: "upload", icon: "upload", label: "Archivo", section: "main" },
+  { kind: "board", icon: "board", label: "Tablero", section: "main" },
   { kind: "trash", icon: "trash", label: "Papelera", section: "bottom" },
 ];
 
 type CanvasPaletteProps = {
   mode: CanvasMode;
+  placementKind: ItemKind | null;
   trashCount: number;
   onModeChange: (mode: CanvasMode) => void;
-  onDragKind: (kind: ItemKind) => void;
+  onPlacementKind: (kind: ItemKind | null) => void;
   onOpenTrash: () => void;
   onUploadFiles: (files: FileList) => void;
 };
 
 export function CanvasPalette({
   mode,
+  placementKind,
   trashCount,
   onModeChange,
-  onDragKind,
+  onPlacementKind,
   onOpenTrash,
   onUploadFiles,
 }: CanvasPaletteProps) {
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const renderTool = (tool: (typeof TOOLS)[number]) => {
-    const isConnect = tool.kind === "connect";
     const isDraw = tool.kind === "draw";
-    const isLine = tool.kind === "line";
     const isTrash = tool.kind === "trash";
     const isUpload = tool.kind === "upload";
-    const isModeTool = isConnect || isDraw || isLine;
+    const isBlock = !isDraw && !isTrash && !isUpload;
     const isActive =
-      (isConnect && mode === "connect") ||
       (isDraw && mode === "draw") ||
-      (isLine && mode === "line");
+      (isBlock && placementKind === tool.kind);
 
     return (
       <button
         key={`${tool.kind}-${tool.label}`}
         type="button"
         className={`canvas-palette-item ${isActive ? "is-active" : ""}`}
-        draggable={!isModeTool && !isTrash && !isUpload}
+        draggable={isBlock}
         onClick={() => {
           if (isTrash) {
             onOpenTrash();
@@ -84,36 +81,31 @@ export function CanvasPalette({
             uploadRef.current?.click();
             return;
           }
-          if (isConnect) {
-            onModeChange("connect");
-            return;
-          }
           if (isDraw) {
+            onPlacementKind(null);
             onModeChange("draw");
             return;
           }
-          if (isLine) {
-            onModeChange("line");
-            return;
-          }
           onModeChange("select");
+          onPlacementKind(tool.kind as ItemKind);
         }}
         onDragStart={(event) => {
-          if (isModeTool || isTrash || isUpload) return;
+          if (!isBlock) return;
           event.dataTransfer.setData(
             "application/x-libreta-item",
             tool.kind as ItemKind,
           );
           event.dataTransfer.setData("text/plain", tool.kind);
           event.dataTransfer.effectAllowed = "copy";
-          onDragKind(tool.kind as ItemKind);
+          onPlacementKind(tool.kind as ItemKind);
         }}
+        onDragEnd={() => onPlacementKind(null)}
         title={tool.label}
+        aria-label={tool.label}
       >
         <span className="canvas-palette-icon">
-          <Icon name={tool.icon} size={18} />
+          <Icon name={tool.icon} size={20} />
         </span>
-        <span className="canvas-palette-label">{tool.label}</span>
         {isTrash && trashCount > 0 ? (
           <span className="canvas-palette-badge">{trashCount}</span>
         ) : null}

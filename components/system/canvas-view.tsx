@@ -1,18 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BoardCard } from "@/components/system/board-card";
 import { ColumnCard } from "@/components/system/column-card";
 import { CanvasPalette } from "@/components/system/canvas-palette";
 import { CanvasSelectionBar } from "@/components/system/canvas-selection-bar";
-import { Icon } from "@/components/system/icon";
 import { ObjectCard } from "@/components/system/object-card";
 import { uploadBoardFile } from "@/lib/workspace/client-upload";
-import { drawingPath, linkCurvePath } from "@/lib/workspace/drawing";
+import { drawingPath } from "@/lib/workspace/drawing";
 import type {
   CanvasCamera,
   CanvasItem,
-  CanvasLink,
   CanvasMode,
   DrawingPoint,
   ItemKind,
@@ -20,36 +18,32 @@ import type {
 
 type CanvasViewProps = {
   items: CanvasItem[];
-  links: CanvasLink[];
   camera: CanvasCamera;
   selectedId: string | null;
-  linkSourceId: string | null;
   mode: CanvasMode;
+  placementKind: ItemKind | null;
   onModeChange: (mode: CanvasMode) => void;
+  onPlacementKind: (kind: ItemKind | null) => void;
   onCameraChange: (camera: CanvasCamera) => void;
   onSelect: (id: string | null) => void;
-  onLink: (targetId: string) => void;
-  onDeleteLink: (linkId: string) => void;
   onCreate: (kind: ItemKind, position: { x: number; y: number }) => string;
   onCreateUploaded: (
     asset: Awaited<ReturnType<typeof uploadBoardFile>>,
     position: { x: number; y: number },
   ) => string;
   onCreateDrawing: (points: DrawingPoint[]) => string;
-  onCreateLine: (points: DrawingPoint[]) => string;
   trashCount: number;
   onOpenTrash: () => void;
   onUpdate: (id: string, changes: Partial<CanvasItem>) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => string;
-  onConnectStart: (id: string) => void;
   onEnterBoard: (item: CanvasItem) => void;
-  onOpenDatabase: (item: CanvasItem) => void;
 };
 
 const DEFAULT_CAMERA: CanvasCamera = { x: 0, y: 0, zoom: 1 };
 const ITEM_KINDS: ItemKind[] = [
   "note",
+  "image",
   "link",
   "todo",
   "column",
@@ -59,36 +53,39 @@ const ITEM_KINDS: ItemKind[] = [
   "video",
 ];
 
+const PLACE_OFFSET = { x: 130, y: 80 };
+
 export function CanvasView({
   items,
-  links,
   camera,
   selectedId,
-  linkSourceId,
   mode,
+  placementKind,
   onModeChange,
+  onPlacementKind,
   onCameraChange,
   onSelect,
-  onLink,
-  onDeleteLink,
   onCreate,
   onCreateUploaded,
   onCreateDrawing,
-  onCreateLine,
   trashCount,
   onOpenTrash,
   onUpdate,
   onDelete,
   onDuplicate,
-  onConnectStart,
   onEnterBoard,
-  onOpenDatabase,
 }: CanvasViewProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const cameraRef = useRef(camera);
   const [liveCamera, setLiveCamera] = useState(camera);
   const [draftPoints, setDraftPoints] = useState<DrawingPoint[]>([]);
   const draftPointsRef = useRef<DrawingPoint[]>([]);
+  const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    cameraRef.current = camera;
+    setLiveCamera(camera);
+  }, [camera]);
 
   const setCamera = (next: CanvasCamera, persist = true) => {
     cameraRef.current = next;
@@ -105,8 +102,47 @@ export function CanvasView({
     };
   };
 
+  const createAtScreen = (clientX: number, clientY: number, kind: ItemKind) => {
+    const position = toWorld(clientX, clientY);
+    const id = onCreate(kind, {
+      x: position.x - PLACE_OFFSET.x,
+      y: position.y - PLACE_OFFSET.y,
+    });
+    onSelect(id);
+    onPlacementKind(null);
+    onModeChange("select");
+    setGhost(null);
+    return id;
+  };
+
+  useEffect(() => {
+    if (!placementKind) {
+      setGhost(null);
+      return;
+    }
+
+    const move = (event: PointerEvent) => {
+      setGhost({ x: event.clientX, y: event.clientY });
+    };
+
+    const place = (event: PointerEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(".canvas-palette")) return;
+      if (target.closest(".canvas-item")) return;
+      if (!viewportRef.current?.contains(target)) return;
+      createAtScreen(event.clientX, event.clientY, placementKind);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerdown", place);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerdown", place);
+    };
+  }, [placementKind]);
+
   const startPan = (event: React.PointerEvent<HTMLElement>) => {
-    if (mode !== "hand" && event.button !== 1) return;
+    if (event.button !== 1) return;
     event.preventDefault();
     onSelect(null);
 
@@ -131,15 +167,13 @@ export function CanvasView({
     window.addEventListener("pointerup", stop, { once: true });
   };
 
-  const startStroke = (
-    event: React.PointerEvent<HTMLElement>,
-    strokeMode: "draw" | "line",
-  ) => {
-    if (mode !== strokeMode || event.button !== 0) return;
+  const startStroke = (event: React.PointerEvent<HTMLElement>) => {
+    if (mode !== "draw" || event.button !== 0) return;
     if (event.target !== event.currentTarget) return;
 
     event.preventDefault();
     onSelect(null);
+    onPlacementKind(null);
 
     const start = toWorld(event.clientX, event.clientY);
     const nextPoints = [start];
@@ -148,12 +182,6 @@ export function CanvasView({
 
     const move = (moveEvent: PointerEvent) => {
       const point = toWorld(moveEvent.clientX, moveEvent.clientY);
-      if (strokeMode === "line") {
-        const updated = [start, point];
-        draftPointsRef.current = updated;
-        setDraftPoints(updated);
-        return;
-      }
       const last = draftPointsRef.current.at(-1);
       if (
         last &&
@@ -174,10 +202,7 @@ export function CanvasView({
       draftPointsRef.current = [];
       setDraftPoints([]);
       if (points.length >= 2) {
-        const id =
-          strokeMode === "line"
-            ? onCreateLine(points)
-            : onCreateDrawing(points);
+        const id = onCreateDrawing(points);
         onSelect(id);
       }
       onModeChange("select");
@@ -233,23 +258,20 @@ export function CanvasView({
     });
   };
 
-  const handleItemSelect = (item: CanvasItem) => {
-    if (mode === "connect") {
-      onLink(item.id);
-      return;
-    }
-    onSelect(item.id);
-  };
-
-  const byId = new Map(items.map((item) => [item.id, item]));
   const canvasItems = items.filter((item) => !item.inUnsorted);
   const columns = canvasItems.filter((item) => item.kind === "column");
   const rootItems = canvasItems.filter(
     (item) => !item.parentColumnId && item.kind !== "column",
   );
-  const selectedItem = selectedId ? byId.get(selectedId) : undefined;
+  const selectedItem = selectedId
+    ? canvasItems.find((item) => item.id === selectedId)
+    : undefined;
 
-  const assignToColumn = (childId: string, columnId: string, sortOrder: number) => {
+  const assignToColumn = (
+    childId: string,
+    columnId: string,
+    sortOrder: number,
+  ) => {
     onUpdate(childId, {
       parentColumnId: columnId,
       sortOrder,
@@ -264,8 +286,8 @@ export function CanvasView({
     onUpdate(itemId, {
       parentColumnId: null,
       inUnsorted: false,
-      x: position.x - 130,
-      y: position.y - 80,
+      x: position.x - PLACE_OFFSET.x,
+      y: position.y - PLACE_OFFSET.y,
     });
   };
 
@@ -284,6 +306,7 @@ export function CanvasView({
         onSelect(id);
         offset += 28;
         onModeChange("select");
+        onPlacementKind(null);
       } catch (error) {
         window.alert(
           error instanceof Error
@@ -297,30 +320,28 @@ export function CanvasView({
   return (
     <section
       ref={viewportRef}
-      className={`canvas-view mode-${mode}`}
+      className={`canvas-view mode-${mode}${placementKind ? " mode-place" : ""}`}
       onPointerDown={(event) => {
         if (mode === "draw") {
-          startStroke(event, "draw");
+          startStroke(event);
           return;
         }
-        if (mode === "line") {
-          startStroke(event, "line");
-          return;
-        }
-        if (mode === "hand" || event.button === 1) {
+        if (event.button === 1) {
           startPan(event);
         } else if (event.target === event.currentTarget) {
           onSelect(null);
         }
       }}
       onDoubleClick={(event) => {
-        if (mode !== "select" || event.target !== event.currentTarget) return;
+        if (mode !== "select" && mode !== "draw") return;
+        if (event.target !== event.currentTarget) return;
         const position = toWorld(event.clientX, event.clientY);
         const id = onCreate("note", {
           x: position.x - 140,
           y: position.y - 100,
         });
         onSelect(id);
+        onPlacementKind(null);
       }}
       onWheel={handleWheel}
       onDragOver={(event) => {
@@ -335,12 +356,13 @@ export function CanvasView({
       }}
       onDrop={(event) => {
         event.preventDefault();
+        onPlacementKind(null);
         const position = toWorld(event.clientX, event.clientY);
 
         if (event.dataTransfer.files.length > 0) {
           void importFiles(event.dataTransfer.files, {
-            x: position.x - 130,
-            y: position.y - 80,
+            x: position.x - PLACE_OFFSET.x,
+            y: position.y - PLACE_OFFSET.y,
           });
           return;
         }
@@ -368,8 +390,8 @@ export function CanvasView({
         ) || event.dataTransfer.getData("text/plain")) as ItemKind;
         if (!ITEM_KINDS.includes(kind)) return;
         const id = onCreate(kind, {
-          x: position.x - 130,
-          y: position.y - 80,
+          x: position.x - PLACE_OFFSET.x,
+          y: position.y - PLACE_OFFSET.y,
         });
         onSelect(id);
         onModeChange("select");
@@ -386,40 +408,6 @@ export function CanvasView({
         }}
       >
         <svg className="connection-layer" width="10000" height="10000">
-          <defs>
-            <marker
-              id="link-arrow"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
-            >
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#9696a6" />
-            </marker>
-          </defs>
-          {links.map((link) => {
-            const from = byId.get(link.fromId);
-            const to = byId.get(link.toId);
-            if (!from || !to) return null;
-            const x1 = from.x + from.width / 2;
-            const y1 = from.y + from.height / 2;
-            const x2 = to.x + to.width / 2;
-            const y2 = to.y + to.height / 2;
-            return (
-              <path
-                key={link.id}
-                className="connection-path"
-                d={linkCurvePath(x1, y1, x2, y2)}
-                markerEnd="url(#link-arrow)"
-                onDoubleClick={(event) => {
-                  event.stopPropagation();
-                  onDeleteLink(link.id);
-                }}
-              />
-            );
-          })}
           {draftPoints.length > 1 ? (
             <path
               className="drawing-draft"
@@ -440,7 +428,7 @@ export function CanvasView({
               item={item}
               zoom={liveCamera.zoom}
               selected={selectedId === item.id}
-              onSelect={() => handleItemSelect(item)}
+              onSelect={() => onSelect(item.id)}
               onMove={(x, y) => onUpdate(item.id, { x, y })}
               onUpdate={(changes) => onUpdate(item.id, changes)}
               onDelete={() => {
@@ -455,9 +443,8 @@ export function CanvasView({
               item={item}
               zoom={liveCamera.zoom}
               selected={selectedId === item.id}
-              linking={mode === "connect"}
               nestedPreview={[]}
-              onSelect={() => handleItemSelect(item)}
+              onSelect={() => onSelect(item.id)}
               onMove={(x, y) => onUpdate(item.id, { x, y })}
               onResize={(width, height) => onUpdate(item.id, { width, height })}
               onUpdate={(changes) => onUpdate(item.id, changes)}
@@ -466,18 +453,13 @@ export function CanvasView({
                 onSelect(null);
               }}
               onEnterBoard={() => onEnterBoard(item)}
-              onOpenDatabase={() => onOpenDatabase(item)}
-              onPrepareDrag={
-                selectedId === item.id
-                  ? (event) => {
-                      event.dataTransfer.setData(
-                        "application/x-libreta-move-item",
-                        item.id,
-                      );
-                      event.dataTransfer.effectAllowed = "move";
-                    }
-                  : undefined
-              }
+              onPrepareDrag={(event) => {
+                event.dataTransfer.setData(
+                  "application/x-libreta-move-item",
+                  item.id,
+                );
+                event.dataTransfer.effectAllowed = "move";
+              }}
             />
           ),
         )}
@@ -491,8 +473,7 @@ export function CanvasView({
             )}
             zoom={liveCamera.zoom}
             selectedId={selectedId}
-            linking={mode === "connect"}
-            onSelect={() => handleItemSelect(column)}
+            onSelect={() => onSelect(column.id)}
             onMove={(x, y) => onUpdate(column.id, { x, y })}
             onResize={(width, height) =>
               onUpdate(column.id, { width, height })
@@ -507,21 +488,27 @@ export function CanvasView({
               onDelete(id);
               onSelect(null);
             }}
-            onChildSelect={(id) => handleItemSelect(byId.get(id)!)}
+            onChildSelect={(id) => onSelect(id)}
             onAssignChild={(childId, sortOrder) =>
               assignToColumn(childId, column.id, sortOrder)
             }
+            onCreateInColumn={(kind, sortOrder) => {
+              const position = { x: column.x + 16, y: column.y + 80 };
+              const id = onCreate(kind, position);
+              assignToColumn(id, column.id, sortOrder);
+              onSelect(id);
+            }}
             onEnterBoard={onEnterBoard}
-            onOpenDatabase={onOpenDatabase}
           />
         ))}
       </div>
 
       <CanvasPalette
         mode={mode}
+        placementKind={placementKind}
         trashCount={trashCount}
         onModeChange={onModeChange}
-        onDragKind={() => undefined}
+        onPlacementKind={onPlacementKind}
         onOpenTrash={onOpenTrash}
         onUploadFiles={(files) => {
           const rect = viewportRef.current?.getBoundingClientRect();
@@ -530,7 +517,10 @@ export function CanvasView({
             rect.left + rect.width / 2,
             rect.top + rect.height / 2,
           );
-          void importFiles(files, { x: center.x - 130, y: center.y - 80 });
+          void importFiles(files, {
+            x: center.x - PLACE_OFFSET.x,
+            y: center.y - PLACE_OFFSET.y,
+          });
         }}
       />
 
@@ -539,18 +529,11 @@ export function CanvasView({
           className="selection-bar-anchor"
           style={{
             left: selectedItem.x * liveCamera.zoom + liveCamera.x + 12,
-            top:
-              selectedItem.y * liveCamera.zoom +
-              liveCamera.y -
-              44,
+            top: selectedItem.y * liveCamera.zoom + liveCamera.y - 44,
           }}
         >
           <CanvasSelectionBar
             onDuplicate={() => onDuplicate(selectedItem.id)}
-            onConnect={() => {
-              onModeChange("connect");
-              onConnectStart(selectedItem.id);
-            }}
             onDelete={() => {
               onDelete(selectedItem.id);
               onSelect(null);
@@ -559,33 +542,8 @@ export function CanvasView({
         </div>
       ) : null}
 
-      <div className="canvas-tools">
-        <button
-          type="button"
-          className={mode === "select" ? "is-active" : ""}
-          onClick={() => onModeChange("select")}
-          title="Seleccionar (V)"
-        >
-          <Icon name="select" size={16} />
-          <span>Seleccionar</span>
-        </button>
-        <button
-          type="button"
-          className={mode === "hand" ? "is-active" : ""}
-          onClick={() => onModeChange("hand")}
-          title="Mover lienzo (H)"
-        >
-          <Icon name="hand" size={16} />
-          <span>Mover</span>
-        </button>
-      </div>
-
       <div className="canvas-controls">
-        <button
-          type="button"
-          onClick={() => zoomAtCenter(0.85)}
-          aria-label="Alejar"
-        >
+        <button type="button" onClick={() => zoomAtCenter(0.85)} aria-label="Alejar">
           −
         </button>
         <button
@@ -596,30 +554,27 @@ export function CanvasView({
         >
           {Math.round(liveCamera.zoom * 100)}%
         </button>
-        <button
-          type="button"
-          onClick={() => zoomAtCenter(1.15)}
-          aria-label="Acercar"
-        >
+        <button type="button" onClick={() => zoomAtCenter(1.15)} aria-label="Acercar">
           +
         </button>
       </div>
 
-      {mode === "connect" ? (
+      {placementKind ? (
         <div className="connect-hint">
-          {linkSourceId
-            ? "Haz clic en el segundo elemento"
-            : "Haz clic en el primer elemento"}
+          Haz clic en el tablero para colocar, o arrastra desde la barra
         </div>
       ) : null}
 
       {mode === "draw" ? (
-        <div className="connect-hint">Arrastra sobre el lienzo para dibujar</div>
+        <div className="connect-hint">Arrastra sobre el tablero para dibujar</div>
       ) : null}
 
-      {mode === "line" ? (
-        <div className="connect-hint">
-          Arrastra para crear una flecha en el diagrama
+      {ghost && placementKind ? (
+        <div
+          className="placement-ghost"
+          style={{ left: ghost.x + 12, top: ghost.y + 12 }}
+        >
+          {placementKind}
         </div>
       ) : null}
     </section>

@@ -2,20 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
-import { DatabaseView } from "@/components/system/database-view";
 import { Icon } from "@/components/system/icon";
 import { TrashPanel } from "@/components/system/trash-panel";
 import { UnsortedPanel } from "@/components/system/unsorted-panel";
 import { useWorkspace } from "@/hooks/use-workspace";
-import type { CanvasMode } from "@/lib/workspace/types";
+import type { CanvasMode, ItemKind } from "@/lib/workspace/types";
 
 export function WorkspaceApp() {
   const workspace = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [linkSourceId, setLinkSourceId] = useState<string | null>(null);
   const [mode, setMode] = useState<CanvasMode>("select");
+  const [placementKind, setPlacementKind] = useState<ItemKind | null>(null);
   const [query, setQuery] = useState("");
-  const [openDatabaseId, setOpenDatabaseId] = useState<string | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [unsortedOpen, setUnsortedOpen] = useState(false);
 
@@ -27,22 +25,28 @@ export function WorkspaceApp() {
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement;
 
-      if (!editing && event.key.toLowerCase() === "v") setMode("select");
-      if (!editing && event.key.toLowerCase() === "h") setMode("hand");
-      if (!editing && event.key.toLowerCase() === "d") setMode("draw");
-      if (!editing && event.key.toLowerCase() === "c") {
-        setMode("connect");
-        setLinkSourceId(null);
-      }
       if (event.key === "Escape") {
-        if (openDatabaseId) {
-          setOpenDatabaseId(null);
+        setPlacementKind(null);
+        setSelectedId(null);
+        setMode("select");
+        return;
+      }
+
+      if (
+        !editing &&
+        selectedId &&
+        (event.metaKey || event.ctrlKey) &&
+        event.key === "Enter"
+      ) {
+        const item = workspace.items.find((entry) => entry.id === selectedId);
+        if (item?.kind === "column") {
+          const nextId = workspace.duplicateItem(selectedId);
+          setSelectedId(nextId);
+          event.preventDefault();
           return;
         }
-        setSelectedId(null);
-        setLinkSourceId(null);
-        setMode("select");
       }
+
       if (
         !editing &&
         selectedId &&
@@ -55,7 +59,7 @@ export function WorkspaceApp() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteItem, openDatabaseId, selectedId]);
+  }, [deleteItem, selectedId, workspace]);
 
   const visibleItems = useMemo(() => {
     const value = query.trim().toLocaleLowerCase();
@@ -72,10 +76,6 @@ export function WorkspaceApp() {
     return <main className="system-loading">Abriendo Libreta…</main>;
   }
 
-  const openDatabase = workspace.items.find(
-    (item) => item.id === openDatabaseId && item.kind === "database",
-  );
-
   const camera = workspace.state.cameras[workspace.activeCanvas.id] ?? {
     x: 0,
     y: 0,
@@ -86,20 +86,6 @@ export function WorkspaceApp() {
   const ancestors = path.slice(0, -1);
   const currentSegment = path[path.length - 1];
   const canGoBack = ancestors.length > 0;
-
-  const handleLink = (targetId: string) => {
-    if (!linkSourceId) {
-      setLinkSourceId(targetId);
-      setSelectedId(targetId);
-      return;
-    }
-    if (linkSourceId !== targetId) {
-      workspace.createLink(linkSourceId, targetId);
-    }
-    setLinkSourceId(null);
-    setSelectedId(targetId);
-    setMode("select");
-  };
 
   return (
     <main className="system-shell system-shell-minimal">
@@ -157,20 +143,17 @@ export function WorkspaceApp() {
         <CanvasView
           key={workspace.activeCanvas.id}
           items={visibleItems}
-          links={workspace.links}
           camera={camera}
           selectedId={selectedId}
-          linkSourceId={linkSourceId}
           mode={mode}
+          placementKind={placementKind}
           onModeChange={setMode}
+          onPlacementKind={setPlacementKind}
           onCameraChange={workspace.updateCamera}
           onSelect={setSelectedId}
-          onLink={handleLink}
-          onDeleteLink={workspace.deleteLink}
           onCreate={workspace.createItem}
           onCreateUploaded={workspace.createUploadedItem}
           onCreateDrawing={workspace.createDrawing}
-          onCreateLine={workspace.createLine}
           trashCount={workspace.trash.length}
           onOpenTrash={() => setTrashOpen(true)}
           onUpdate={workspace.updateItem}
@@ -180,29 +163,15 @@ export function WorkspaceApp() {
             setSelectedId(nextId);
             return nextId;
           }}
-          onConnectStart={setLinkSourceId}
           onEnterBoard={(item) => {
             if (item.nestedCanvasId) {
               setSelectedId(null);
-              setOpenDatabaseId(null);
-              setLinkSourceId(null);
+              setPlacementKind(null);
               workspace.enterCanvas(item.nestedCanvasId);
             }
           }}
-          onOpenDatabase={(item) => {
-            setSelectedId(item.id);
-            setOpenDatabaseId(item.id);
-          }}
         />
       </section>
-
-      {openDatabase ? (
-        <DatabaseView
-          item={openDatabase}
-          onUpdate={(changes) => workspace.updateItem(openDatabase.id, changes)}
-          onClose={() => setOpenDatabaseId(null)}
-        />
-      ) : null}
 
       {trashOpen ? (
         <TrashPanel
