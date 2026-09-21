@@ -230,8 +230,8 @@ export function CanvasView({
 
       {!boardItems.length ? (
         <div className="canvas-empty">
-          <strong>Tu pizarra está vacía</strong>
-          <span>Pulsa Pizarra en la barra o arrástrala al lienzo.</span>
+          <strong>Tu tablero está vacío</strong>
+          <span>Pulsa Tablero en la barra o arrástralo al lienzo.</span>
         </div>
       ) : null}
 

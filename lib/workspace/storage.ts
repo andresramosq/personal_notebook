@@ -9,7 +9,7 @@ import type {
 
 const STORAGE_KEY = "libreta:workspace:v1";
 const DEFAULT_CAMERA = { x: 0, y: 0, zoom: 1 };
-const MAIN_SPACE_NAME = "Mi pizarra";
+const MAIN_SPACE_NAME = "Mi tablero";
 
 export function hasLocalWorkspace() {
   return (
@@ -346,8 +346,8 @@ function migrateKind(kind?: string): ItemKind {
 }
 
 function defaultTitle(kind: ItemKind) {
-  if (kind === "board") return "Pizarra";
-  return "Pizarra";
+  if (kind === "board") return "Tablero";
+  return "Tablero";
 }
 
 function defaultWidth(kind: ItemKind) {

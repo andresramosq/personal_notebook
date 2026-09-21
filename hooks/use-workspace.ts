@@ -43,8 +43,9 @@ export function useWorkspace() {
           state: WorkspaceState;
           isNew: boolean;
         };
-        const nextState =
+        const rawState =
           result.isNew && hasLocalWorkspace() ? loadWorkspace() : result.state;
+        const nextState = normalizeWorkspace(rawState);
 
         if (!cancelled) {
           hydratedRef.current = true;
@@ -144,6 +145,18 @@ export function useWorkspace() {
         : undefined,
     [activeCanvas, state],
   );
+
+  const canvasPath = useMemo(() => {
+    if (!state?.activeCanvasId) return [];
+    const byId = new Map(state.canvases.map((canvas) => [canvas.id, canvas]));
+    const path = [];
+    let current = byId.get(state.activeCanvasId);
+    while (current) {
+      path.unshift(current);
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    return path;
+  }, [state]);
 
   const update = (recipe: (current: WorkspaceState) => WorkspaceState) => {
     setState((current) => (current ? recipe(current) : current));
@@ -247,7 +260,7 @@ export function useWorkspace() {
         ...extraCanvases,
         {
           id: nestedCanvasId,
-          name: "Pizarra anidada",
+          name: "Tablero anidado",
           parentId: state.activeCanvasId,
           createdAt: now,
           updatedAt: now,
@@ -424,7 +437,7 @@ export function useWorkspace() {
           ...extraCanvases,
           {
             id: nestedCanvasId,
-            name: `${item.title || "Pizarra anidada"} (copia)`,
+            name: `${item.title || "Tablero anidado"} (copia)`,
             parentId: item.canvasId,
             createdAt: now,
             updatedAt: now,
@@ -619,6 +632,7 @@ export function useWorkspace() {
     state,
     activeCanvas,
     parentCanvas,
+    canvasPath,
     rootCanvases,
     items,
     links,
@@ -647,7 +661,7 @@ export function useWorkspace() {
 }
 
 function defaultItemTitle(kind: ItemKind) {
-  if (kind === "board") return "Pizarra anidada";
+  if (kind === "board") return "Tablero anidado";
   if (kind === "link") return "Enlace";
   if (kind === "image") return "Imagen";
   if (kind === "database") return "Base de datos";

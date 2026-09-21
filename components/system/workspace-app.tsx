@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
+import { Icon } from "@/components/system/icon";
 import { useWorkspace } from "@/hooks/use-workspace";
 import type { CanvasMode } from "@/lib/workspace/types";
 
@@ -46,43 +47,38 @@ export function WorkspaceApp() {
     zoom: 1,
   };
 
-  const isMainBoard = workspace.activeCanvas.parentId === null;
+  const path = workspace.canvasPath;
+  const ancestors = path.slice(0, -1);
+  const canGoBack = ancestors.length > 0;
 
   return (
     <main className="system-shell system-shell-minimal">
-      <header className="system-header">
-        <div className="canvas-heading">
-          {workspace.parentCanvas ? (
-            <button
-              type="button"
-              className="breadcrumb-back"
-              onClick={workspace.goToParentCanvas}
-            >
-              ← {workspace.parentCanvas.name}
-            </button>
-          ) : null}
+      <header className="system-header board-header">
+        {canGoBack ? (
+          <button
+            type="button"
+            className="board-header-back"
+            onClick={workspace.goToParentCanvas}
+            aria-label="Volver al tablero anterior"
+          >
+            <Icon name="chevron" size={18} />
+          </button>
+        ) : null}
+
+        <nav className="board-header-path" aria-label="Ruta del tablero">
+          {ancestors.map((canvas) => (
+            <span key={canvas.id} className="board-header-crumb">
+              <span>{canvas.name}</span>
+              <span className="board-header-sep">/</span>
+            </span>
+          ))}
           <input
+            className="board-header-name"
             value={workspace.activeCanvas.name}
             onChange={(event) => workspace.renameCanvas(event.target.value)}
-            aria-label="Nombre del tablero"
+            aria-label="Nombre del tablero actual"
           />
-          <span className="board-kind-label">
-            {isMainBoard ? "Pizarra principal" : "Pizarra anidada"}
-          </span>
-        </div>
-
-        <div
-          className={`database-status is-${workspace.persistenceStatus}`}
-          title="Persistencia SQLite"
-        >
-          <span />
-          {workspace.persistenceStatus === "loading" ||
-          workspace.persistenceStatus === "saving"
-            ? "Guardando…"
-            : workspace.persistenceStatus === "error"
-              ? "Sin conexión"
-              : "Guardado"}
-        </div>
+        </nav>
       </header>
 
       <section className="system-content">

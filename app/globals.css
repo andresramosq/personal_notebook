@@ -332,6 +332,73 @@ button {
   padding: 0 16px;
 }
 
+.board-header {
+  gap: 8px;
+  padding: 0 14px;
+  min-height: 48px;
+}
+
+.board-header-back {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.board-header-back svg {
+  transform: rotate(180deg);
+}
+
+.board-header-back:hover {
+  background: #f2f2ef;
+  color: var(--text);
+}
+
+.board-header-path {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.board-header-crumb {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.board-header-crumb > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-header-sep {
+  margin: 0 8px;
+  color: var(--faint);
+}
+
+.board-header-name {
+  min-width: 80px;
+  flex: 1 1 auto;
+  border: 0;
+  background: transparent;
+  outline: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .sidebar-toggle {
   display: none;
   width: 34px;

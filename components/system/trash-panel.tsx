@@ -69,7 +69,7 @@ function labelForKind(kind: string) {
     link: "Enlace",
     todo: "To-do",
     kanban: "Tablero",
-    board: "Pizarra",
+    board: "Tablero",
     comment: "Comentario",
     database: "Tabla",
     image: "Imagen",

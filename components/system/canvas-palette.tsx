@@ -53,12 +53,12 @@ export function CanvasPalette({
             event.dataTransfer.setData("text/plain", "board");
             event.dataTransfer.effectAllowed = "copy";
           }}
-          title="Pizarra anidada"
+          title="Tablero anidado"
         >
           <span className="canvas-palette-icon">
             <Icon name="board" size={18} />
           </span>
-          <span className="canvas-palette-label">Pizarra</span>
+          <span className="canvas-palette-label">Tablero</span>
         </button>
       </div>
     </aside>
