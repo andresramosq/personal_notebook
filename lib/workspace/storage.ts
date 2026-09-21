@@ -358,6 +358,8 @@ function migrateKind(kind?: string): ItemKind {
   if (kind === "text") return "text";
   if (kind === "link") return "link";
   if (kind === "image") return "image";
+  if (kind === "video") return "video";
+  if (kind === "file") return "file";
   if (kind === "database") return "database";
   if (kind === "drawing") return "drawing";
   if (kind === "todo") return "todo";

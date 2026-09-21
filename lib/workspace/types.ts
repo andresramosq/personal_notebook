@@ -4,6 +4,8 @@ export type ItemKind =
   | "board"
   | "link"
   | "image"
+  | "video"
+  | "file"
   | "database"
   | "drawing"
   | "todo"
@@ -98,4 +100,4 @@ export type WorkspaceState = {
   activeCanvasId: string;
 };
 
-export type PaletteKind = ItemKind | "connect" | "draw" | "trash";
+export type PaletteKind = ItemKind | "connect" | "draw" | "trash" | "upload";

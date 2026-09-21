@@ -153,6 +153,7 @@ export function WorkspaceApp() {
           onLink={handleLink}
           onDeleteLink={workspace.deleteLink}
           onCreate={workspace.createItem}
+          onCreateUploaded={workspace.createUploadedItem}
           onCreateDrawing={workspace.createDrawing}
           onCreateLine={workspace.createLine}
           trashCount={workspace.trash.length}

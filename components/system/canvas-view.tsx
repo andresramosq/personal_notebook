@@ -6,6 +6,7 @@ import { CanvasPalette } from "@/components/system/canvas-palette";
 import { CanvasSelectionBar } from "@/components/system/canvas-selection-bar";
 import { Icon } from "@/components/system/icon";
 import { ObjectCard } from "@/components/system/object-card";
+import { uploadBoardFile } from "@/lib/workspace/client-upload";
 import { drawingPath, linkCurvePath } from "@/lib/workspace/drawing";
 import type {
   CanvasCamera,
@@ -29,6 +30,10 @@ type CanvasViewProps = {
   onLink: (targetId: string) => void;
   onDeleteLink: (linkId: string) => void;
   onCreate: (kind: ItemKind, position: { x: number; y: number }) => string;
+  onCreateUploaded: (
+    asset: Awaited<ReturnType<typeof uploadBoardFile>>,
+    position: { x: number; y: number },
+  ) => string;
   onCreateDrawing: (points: DrawingPoint[]) => string;
   onCreateLine: (points: DrawingPoint[]) => string;
   trashCount: number;
@@ -50,8 +55,7 @@ const ITEM_KINDS: ItemKind[] = [
   "board",
   "database",
   "todo",
-  "kanban",
-  "comment",
+  "video",
 ];
 
 export function CanvasView({
@@ -67,6 +71,7 @@ export function CanvasView({
   onLink,
   onDeleteLink,
   onCreate,
+  onCreateUploaded,
   onCreateDrawing,
   onCreateLine,
   trashCount,
@@ -238,6 +243,31 @@ export function CanvasView({
   const byId = new Map(items.map((item) => [item.id, item]));
   const selectedItem = selectedId ? byId.get(selectedId) : undefined;
 
+  const importFiles = async (
+    files: FileList,
+    origin: { x: number; y: number },
+  ) => {
+    let offset = 0;
+    for (const file of Array.from(files)) {
+      try {
+        const asset = await uploadBoardFile(file);
+        const id = onCreateUploaded(asset, {
+          x: origin.x + offset,
+          y: origin.y + offset,
+        });
+        onSelect(id);
+        offset += 28;
+        onModeChange("select");
+      } catch (error) {
+        window.alert(
+          error instanceof Error
+            ? error.message
+            : "No se pudo subir el archivo",
+        );
+      }
+    }
+  };
+
   return (
     <section
       ref={viewportRef}
@@ -269,6 +299,7 @@ export function CanvasView({
       onWheel={handleWheel}
       onDragOver={(event) => {
         if (
+          event.dataTransfer.types.includes("Files") ||
           event.dataTransfer.types.includes("application/x-libreta-item") ||
           event.dataTransfer.types.includes("text/plain")
         ) {
@@ -277,12 +308,21 @@ export function CanvasView({
         }
       }}
       onDrop={(event) => {
+        event.preventDefault();
+        const position = toWorld(event.clientX, event.clientY);
+
+        if (event.dataTransfer.files.length > 0) {
+          void importFiles(event.dataTransfer.files, {
+            x: position.x - 130,
+            y: position.y - 80,
+          });
+          return;
+        }
+
         const kind = (event.dataTransfer.getData(
           "application/x-libreta-item",
         ) || event.dataTransfer.getData("text/plain")) as ItemKind;
         if (!ITEM_KINDS.includes(kind)) return;
-        event.preventDefault();
-        const position = toWorld(event.clientX, event.clientY);
         const id = onCreate(kind, {
           x: position.x - 130,
           y: position.y - 80,
@@ -394,6 +434,15 @@ export function CanvasView({
         onModeChange={onModeChange}
         onDragKind={() => undefined}
         onOpenTrash={onOpenTrash}
+        onUploadFiles={(files) => {
+          const rect = viewportRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          const center = toWorld(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2,
+          );
+          void importFiles(files, { x: center.x - 130, y: center.y - 80 });
+        }}
       />
 
       {selectedItem ? (

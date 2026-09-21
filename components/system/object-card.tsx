@@ -4,6 +4,11 @@ import { memo, useEffect, useRef, useState } from "react";
 import { BlockKanban } from "@/components/system/block-kanban";
 import { BlockTodo } from "@/components/system/block-todo";
 import { Icon } from "@/components/system/icon";
+import {
+  getVideoEmbedUrl,
+  isDisplayableImageUrl,
+  isUploadedAssetUrl,
+} from "@/lib/workspace/embed";
 import { drawingPath } from "@/lib/workspace/drawing";
 import type { CanvasItem, ItemColor } from "@/lib/workspace/types";
 
@@ -361,7 +366,7 @@ export const ObjectCard = memo(function ObjectCard({
               onPointerDown={(event) => event.stopPropagation()}
               onChange={(event) => onUpdate({ title: event.target.value })}
             />
-            {item.url.startsWith("http") ? (
+            {isDisplayableImageUrl(item.url) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 className="image-preview"
@@ -378,6 +383,62 @@ export const ObjectCard = memo(function ObjectCard({
               />
             )}
           </>
+        ) : null}
+
+        {item.kind === "video" ? (
+          <>
+            <input
+              className="item-title"
+              value={item.title}
+              placeholder="Video"
+              onPointerDown={(event) => event.stopPropagation()}
+              onChange={(event) => onUpdate({ title: event.target.value })}
+            />
+            {getVideoEmbedUrl(item.url) ? (
+              <iframe
+                className="video-embed"
+                src={getVideoEmbedUrl(item.url) ?? undefined}
+                title={item.title || "Video"}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : isUploadedAssetUrl(item.url) ? (
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <video className="video-file" src={item.url} controls />
+            ) : (
+              <input
+                className="link-url"
+                value={item.url}
+                placeholder="Pega un enlace de YouTube o Vimeo"
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ url: event.target.value })}
+              />
+            )}
+          </>
+        ) : null}
+
+        {item.kind === "file" ? (
+          <div className="file-card">
+            <span className="file-card-icon">📄</span>
+            <div className="file-card-meta">
+              <input
+                className="item-title"
+                value={item.title}
+                onPointerDown={(event) => event.stopPropagation()}
+                onChange={(event) => onUpdate({ title: event.target.value })}
+              />
+              {item.url ? (
+                <a
+                  className="file-card-link"
+                  href={item.url}
+                  download={item.title || undefined}
+                  onPointerDown={(event) => event.stopPropagation()}
+                >
+                  Descargar archivo
+                </a>
+              ) : null}
+            </div>
+          </div>
         ) : null}
 
         {item.kind === "todo" ? (

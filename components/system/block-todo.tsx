@@ -21,7 +21,11 @@ export function BlockTodo({ content, onChange }: BlockTodoProps) {
   return (
     <div className="block-todo">
       {block.items.map((item) => (
-        <label key={item.id} className="todo-row">
+        <label
+          key={item.id}
+          className="todo-row"
+          style={{ paddingLeft: `${item.indent * 18}px` }}
+        >
           <input
             type="checkbox"
             checked={item.done}
@@ -45,6 +49,24 @@ export function BlockTodo({ content, onChange }: BlockTodoProps) {
                 items: block.items.map((entry) =>
                   entry.id === item.id
                     ? { ...entry, text: event.target.value }
+                    : entry,
+                ),
+              });
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Tab") return;
+              event.preventDefault();
+              const delta = event.shiftKey ? -1 : 1;
+              save({
+                items: block.items.map((entry) =>
+                  entry.id === item.id
+                    ? {
+                        ...entry,
+                        indent: Math.max(
+                          0,
+                          Math.min(4, entry.indent + delta),
+                        ),
+                      }
                     : entry,
                 ),
               });
@@ -73,7 +95,7 @@ export function BlockTodo({ content, onChange }: BlockTodoProps) {
           save({
             items: [
               ...block.items,
-              { id: createId(), text: "Nueva tarea", done: false },
+              { id: createId(), text: "Nueva tarea", done: false, indent: 0 },
             ],
           });
         }}

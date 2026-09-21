@@ -6,6 +6,10 @@ import {
   createDefaultKanbanContent,
   createDefaultTodoContent,
 } from "@/lib/workspace/blocks";
+import {
+  itemKindForUpload,
+  type UploadedAsset,
+} from "@/lib/workspace/client-upload";
 import { normalizeDrawingPoints } from "@/lib/workspace/drawing";
 import {
   createInitialWorkspace,
@@ -314,7 +318,12 @@ export function useWorkspace() {
               : kind === "comment"
                 ? "Escribe tu comentario…"
                 : "",
-      url: kind === "link" ? "https://" : "",
+      url:
+        kind === "link"
+          ? "https://"
+          : kind === "video"
+            ? ""
+            : "",
       nestedCanvasId,
       databaseFields:
         kind === "database"
@@ -359,6 +368,45 @@ export function useWorkspace() {
       ...current,
       canvases: kind === "board" ? extraCanvases : current.canvases,
       cameras: kind === "board" ? extraCameras : current.cameras,
+      items: [...current.items, item],
+    }));
+
+    return id;
+  };
+
+  const createUploadedItem = (
+    asset: UploadedAsset,
+    position: { x: number; y: number },
+  ) => {
+    if (!state?.activeCanvasId) return "";
+
+    const kind = itemKindForUpload(asset.kind);
+    const id = createId();
+    const now = Date.now();
+    const item: CanvasItem = {
+      id,
+      canvasId: state.activeCanvasId,
+      kind,
+      title: kind === "file" ? asset.name : kind === "video" ? "Video" : asset.name,
+      content: "",
+      url: asset.url,
+      nestedCanvasId: null,
+      databaseFields: [],
+      databaseRecords: [],
+      points: [],
+      strokeColor: "#292929",
+      strokeWidth: 2,
+      x: position.x,
+      y: position.y,
+      width: defaultItemWidth(kind),
+      height: defaultItemHeight(kind),
+      color: "white",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    update((current) => ({
+      ...current,
       items: [...current.items, item],
     }));
 
@@ -553,46 +601,15 @@ export function useWorkspace() {
       const item = current.items.find((candidate) => candidate.id === id);
       if (!item) return current;
 
-      const nestedIds = new Set<string>();
-      if (item.kind === "board" && item.nestedCanvasId) {
-        const collectNested = (canvasId: string) => {
-          nestedIds.add(canvasId);
-          current.canvases
-            .filter((canvas) => canvas.parentId === canvasId)
-            .forEach((canvas) => collectNested(canvas.id));
-        };
-        collectNested(item.nestedCanvasId);
-      }
-
-      const canvases = current.canvases.filter(
-        (canvas) => !nestedIds.has(canvas.id),
-      );
-      const cameras = { ...current.cameras };
-      nestedIds.forEach((canvasId) => delete cameras[canvasId]);
-      const nextActiveCanvasId = nestedIds.has(current.activeCanvasId)
-        ? (canvases.find((canvas) => canvas.parentId === null)?.id ??
-          canvases[0]?.id ??
-          "")
-        : current.activeCanvasId;
-
       return {
         ...current,
-        activeCanvasId: nextActiveCanvasId,
-        canvases,
-        cameras,
         trash: [
           { item, deletedAt: Date.now() },
           ...current.trash.filter((entry) => entry.item.id !== item.id),
         ],
-        items: current.items.filter(
-          (candidate) =>
-            candidate.id !== id && !nestedIds.has(candidate.canvasId),
-        ),
+        items: current.items.filter((candidate) => candidate.id !== id),
         links: current.links.filter(
-          (link) =>
-            link.fromId !== id &&
-            link.toId !== id &&
-            !nestedIds.has(link.canvasId),
+          (link) => link.fromId !== id && link.toId !== id,
         ),
       };
     });
@@ -617,10 +634,48 @@ export function useWorkspace() {
   };
 
   const purgeFromTrash = (itemId: string) => {
-    update((current) => ({
-      ...current,
-      trash: current.trash.filter((candidate) => candidate.item.id !== itemId),
-    }));
+    update((current) => {
+      const entry = current.trash.find(
+        (candidate) => candidate.item.id === itemId,
+      );
+      if (!entry) return current;
+
+      const nestedIds = new Set<string>();
+      if (entry.item.kind === "board" && entry.item.nestedCanvasId) {
+        const collectNested = (canvasId: string) => {
+          nestedIds.add(canvasId);
+          current.canvases
+            .filter((canvas) => canvas.parentId === canvasId)
+            .forEach((canvas) => collectNested(canvas.id));
+        };
+        collectNested(entry.item.nestedCanvasId);
+      }
+
+      const canvases = current.canvases.filter(
+        (canvas) => !nestedIds.has(canvas.id),
+      );
+      const cameras = { ...current.cameras };
+      nestedIds.forEach((canvasId) => delete cameras[canvasId]);
+      const nextActiveCanvasId = nestedIds.has(current.activeCanvasId)
+        ? (canvases.find((canvas) => canvas.parentId === null)?.id ??
+          canvases[0]?.id ??
+          current.activeCanvasId)
+        : current.activeCanvasId;
+
+      return {
+        ...current,
+        activeCanvasId: nextActiveCanvasId,
+        canvases,
+        cameras,
+        items: current.items.filter(
+          (item) => !nestedIds.has(item.canvasId),
+        ),
+        links: current.links.filter((link) => !nestedIds.has(link.canvasId)),
+        trash: current.trash.filter(
+          (candidate) => candidate.item.id !== itemId,
+        ),
+      };
+    });
   };
 
   const createLink = (fromId: string, toId: string) => {
@@ -693,6 +748,7 @@ export function useWorkspace() {
     renameCanvas,
     deleteCanvas,
     createItem,
+    createUploadedItem,
     createDrawing,
     createLine,
     duplicateItem,
@@ -714,6 +770,8 @@ function defaultItemTitle(kind: ItemKind) {
   if (kind === "board") return "Nuevo tablero";
   if (kind === "link") return "Enlace";
   if (kind === "image") return "Imagen";
+  if (kind === "video") return "Video";
+  if (kind === "file") return "Archivo";
   if (kind === "database") return "Base de datos";
   if (kind === "todo") return "To-do";
   if (kind === "kanban") return "Columnas";
@@ -726,7 +784,9 @@ function defaultItemWidth(kind: ItemKind) {
   if (kind === "text") return 280;
   if (kind === "board") return 200;
   if (kind === "link") return 240;
-  if (kind === "image") return 220;
+  if (kind === "image") return 280;
+  if (kind === "video") return 360;
+  if (kind === "file") return 260;
   if (kind === "database") return 420;
   if (kind === "drawing") return 120;
   if (kind === "todo") return 260;
@@ -740,7 +800,9 @@ function defaultItemHeight(kind: ItemKind) {
   if (kind === "text") return 90;
   if (kind === "board") return 44;
   if (kind === "link") return 110;
-  if (kind === "image") return 160;
+  if (kind === "image") return 200;
+  if (kind === "video") return 220;
+  if (kind === "file") return 88;
   if (kind === "database") return 240;
   if (kind === "drawing") return 80;
   if (kind === "todo") return 180;

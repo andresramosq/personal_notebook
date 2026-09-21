@@ -70,6 +70,8 @@ function labelForKind(kind: string) {
     todo: "To-do",
     kanban: "Tablero",
     board: "Tablero",
+    video: "Video",
+    file: "Archivo",
     comment: "Comentario",
     database: "Tabla",
     image: "Imagen",

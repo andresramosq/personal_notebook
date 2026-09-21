@@ -4,6 +4,7 @@ export type TodoItem = {
   id: string;
   text: string;
   done: boolean;
+  indent: number;
 };
 
 export type KanbanCard = {
@@ -28,8 +29,8 @@ export type KanbanBlock = {
 export function createDefaultTodoContent() {
   const block: TodoBlock = {
     items: [
-      { id: createId(), text: "Nueva tarea", done: false },
-      { id: createId(), text: "Otra tarea", done: false },
+      { id: createId(), text: "Nueva tarea", done: false, indent: 0 },
+      { id: createId(), text: "Otra tarea", done: false, indent: 0 },
     ],
   };
   return JSON.stringify(block);
@@ -59,6 +60,10 @@ export function parseTodoContent(content: string): TodoBlock {
           id: item.id,
           text: item.text ?? "",
           done: Boolean(item.done),
+          indent:
+            typeof item.indent === "number"
+              ? Math.max(0, Math.min(4, item.indent))
+              : 0,
         })),
     };
   } catch {

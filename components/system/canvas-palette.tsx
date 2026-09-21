@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { Icon } from "@/components/system/icon";
 import type { CanvasMode, ItemKind, PaletteKind } from "@/lib/workspace/types";
 
@@ -10,10 +11,7 @@ const TOOLS: Array<{
     | "link"
     | "todo"
     | "line"
-    | "kanban"
     | "board"
-    | "comment"
-    | "database"
     | "image"
     | "upload"
     | "pen"
@@ -26,12 +24,9 @@ const TOOLS: Array<{
   { kind: "link", icon: "link", label: "Enlace", section: "main" },
   { kind: "todo", icon: "todo", label: "To-do", section: "main" },
   { kind: "line", icon: "line", label: "Línea", section: "main" },
-  { kind: "kanban", icon: "kanban", label: "Columnas", section: "main" },
   { kind: "board", icon: "board", label: "Tablero", section: "main" },
-  { kind: "comment", icon: "comment", label: "Comentario", section: "main" },
-  { kind: "database", icon: "database", label: "Tabla", section: "main" },
-  { kind: "image", icon: "image", label: "Imagen", section: "bottom" },
-  { kind: "image", icon: "upload", label: "Subir", section: "bottom" },
+  { kind: "video", icon: "image", label: "Video", section: "main" },
+  { kind: "upload", icon: "upload", label: "Subir", section: "bottom" },
   { kind: "draw", icon: "pen", label: "Dibujar", section: "bottom" },
   { kind: "connect", icon: "connect", label: "Unir", section: "bottom" },
   { kind: "trash", icon: "trash", label: "Papelera", section: "bottom" },
@@ -43,6 +38,7 @@ type CanvasPaletteProps = {
   onModeChange: (mode: CanvasMode) => void;
   onDragKind: (kind: ItemKind) => void;
   onOpenTrash: () => void;
+  onUploadFiles: (files: FileList) => void;
 };
 
 export function CanvasPalette({
@@ -51,12 +47,16 @@ export function CanvasPalette({
   onModeChange,
   onDragKind,
   onOpenTrash,
+  onUploadFiles,
 }: CanvasPaletteProps) {
+  const uploadRef = useRef<HTMLInputElement>(null);
+
   const renderTool = (tool: (typeof TOOLS)[number]) => {
     const isConnect = tool.kind === "connect";
     const isDraw = tool.kind === "draw";
     const isLine = tool.kind === "line";
     const isTrash = tool.kind === "trash";
+    const isUpload = tool.kind === "upload";
     const isModeTool = isConnect || isDraw || isLine;
     const isActive =
       (isConnect && mode === "connect") ||
@@ -68,10 +68,14 @@ export function CanvasPalette({
         key={`${tool.kind}-${tool.label}`}
         type="button"
         className={`canvas-palette-item ${isActive ? "is-active" : ""}`}
-        draggable={!isModeTool && !isTrash}
+        draggable={!isModeTool && !isTrash && !isUpload}
         onClick={() => {
           if (isTrash) {
             onOpenTrash();
+            return;
+          }
+          if (isUpload) {
+            uploadRef.current?.click();
             return;
           }
           if (isConnect) {
@@ -89,7 +93,7 @@ export function CanvasPalette({
           onModeChange("select");
         }}
         onDragStart={(event) => {
-          if (isModeTool || isTrash) return;
+          if (isModeTool || isTrash || isUpload) return;
           event.dataTransfer.setData(
             "application/x-libreta-item",
             tool.kind as ItemKind,
@@ -113,6 +117,19 @@ export function CanvasPalette({
 
   return (
     <aside className="canvas-palette">
+      <input
+        ref={uploadRef}
+        type="file"
+        hidden
+        multiple
+        accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.webm,.mov,.pdf,.zip,.txt,.md,image/*,video/*,application/pdf"
+        onChange={(event) => {
+          if (event.target.files?.length) {
+            onUploadFiles(event.target.files);
+            event.target.value = "";
+          }
+        }}
+      />
       <div className="canvas-palette-tools">
         {TOOLS.filter((tool) => tool.section === "main").map(renderTool)}
       </div>
