@@ -8,7 +8,8 @@ type BoardCardProps = {
   item: CanvasItem;
   zoom: number;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (additive?: boolean) => void;
+  onContextMenu?: (clientX: number, clientY: number) => void;
   onMove: (x: number, y: number) => void;
   onUpdate: (changes: Partial<CanvasItem>) => void;
   onDelete: () => void;
@@ -20,6 +21,7 @@ export const BoardCard = memo(function BoardCard({
   zoom,
   selected,
   onSelect,
+  onContextMenu,
   onMove,
   onUpdate,
   onDelete,
@@ -45,7 +47,6 @@ export const BoardCard = memo(function BoardCard({
     if (event.button !== 0 || renaming) return;
     event.preventDefault();
     event.stopPropagation();
-    onSelect();
 
     const start = { x: event.clientX, y: event.clientY };
     const origin = positionRef.current;
@@ -76,9 +77,14 @@ export const BoardCard = memo(function BoardCard({
           width: item.width,
           height: item.height,
         }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onContextMenu?.(event.clientX, event.clientY);
+        }}
         onPointerDown={(event) => {
           event.stopPropagation();
-          onSelect();
+          onSelect(event.shiftKey);
         }}
         onDoubleClick={(event) => {
           event.stopPropagation();

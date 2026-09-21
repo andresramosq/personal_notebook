@@ -9,7 +9,7 @@ type ColumnCardProps = {
   item: CanvasItem;
   children: CanvasItem[];
   zoom: number;
-  selectedId: string | null;
+  selectedIds: string[];
   dropHint: number | null;
   onSelect: () => void;
   onMove: (x: number, y: number) => void;
@@ -18,7 +18,7 @@ type ColumnCardProps = {
   onDelete: () => void;
   onChildUpdate: (id: string, changes: Partial<CanvasItem>) => void;
   onChildDelete: (id: string) => void;
-  onChildSelect: (id: string) => void;
+  onChildSelect: (id: string, additive?: boolean) => void;
   onItemDragFinish: (
     itemId: string,
     clientX: number,
@@ -32,7 +32,7 @@ export const ColumnCard = memo(function ColumnCard({
   item,
   children,
   zoom,
-  selectedId,
+  selectedIds,
   dropHint,
   onSelect,
   onMove,
@@ -104,7 +104,7 @@ export const ColumnCard = memo(function ColumnCard({
   return (
     <article
       className={`canvas-item item-column color-${item.color} ${
-        selectedId === item.id ? "is-selected" : ""
+        selectedIds.includes(item.id) ? "is-selected" : ""
       }`}
       style={{
         transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
@@ -153,9 +153,9 @@ export const ColumnCard = memo(function ColumnCard({
                   <ObjectCard
                     item={child}
                     zoom={1}
-                    selected={selectedId === child.id}
+                    selected={selectedIds.includes(child.id)}
                     embedded
-                    onSelect={() => onChildSelect(child.id)}
+                    onSelect={(additive) => onChildSelect(child.id, additive)}
                     onMove={() => undefined}
                     onResize={(width, height) =>
                       onChildUpdate(child.id, { width, height })
@@ -186,7 +186,7 @@ export const ColumnCard = memo(function ColumnCard({
         )}
       </div>
 
-      {selectedId === item.id ? (
+      {selectedIds.includes(item.id) ? (
         <>
           <button
             type="button"

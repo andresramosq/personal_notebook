@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardCard } from "@/components/system/board-card";
 import { ColumnCard } from "@/components/system/column-card";
+import { CanvasContextMenu } from "@/components/system/canvas-context-menu";
 import { CanvasPalette } from "@/components/system/canvas-palette";
 import { CanvasSelectionBar } from "@/components/system/canvas-selection-bar";
 import { ObjectCard } from "@/components/system/object-card";
@@ -20,13 +21,15 @@ import type {
 type CanvasViewProps = {
   items: CanvasItem[];
   camera: CanvasCamera;
-  selectedId: string | null;
+  selectedIds: string[];
   mode: CanvasMode;
   placementKind: ItemKind | null;
   onModeChange: (mode: CanvasMode) => void;
   onPlacementKind: (kind: ItemKind | null) => void;
   onCameraChange: (camera: CanvasCamera) => void;
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string | null, additive?: boolean) => void;
+  onSelectMany: (ids: string[]) => void;
+  onGroupIntoColumn: (ids: string[]) => void;
   onCreate: (kind: ItemKind, position: { x: number; y: number }) => string;
   onCreateUploaded: (
     asset: Awaited<ReturnType<typeof uploadBoardFile>>,
@@ -56,13 +59,15 @@ const PLACE_OFFSET = { x: 130, y: 80 };
 export function CanvasView({
   items,
   camera,
-  selectedId,
+  selectedIds,
   mode,
   placementKind,
   onModeChange,
   onPlacementKind,
   onCameraChange,
   onSelect,
+  onSelectMany,
+  onGroupIntoColumn,
   onCreate,
   onCreateUploaded,
   onCreateDrawing,
@@ -84,6 +89,16 @@ export function CanvasView({
   const [columnDropHint, setColumnDropHint] = useState<{
     columnId: string;
     index: number;
+  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [marquee, setMarquee] = useState<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
   } | null>(null);
 
   useEffect(() => {
@@ -111,9 +126,81 @@ export function CanvasView({
   const rootItems = canvasItems.filter(
     (item) => !item.parentColumnId && item.kind !== "column",
   );
-  const selectedItem = selectedId
-    ? canvasItems.find((item) => item.id === selectedId)
-    : undefined;
+  const selectedItem =
+    selectedIds.length === 1
+      ? canvasItems.find((item) => item.id === selectedIds[0])
+      : undefined;
+
+  const groupableSelectedIds = selectedIds.filter((id) => {
+    const item = canvasItems.find((entry) => entry.id === id);
+    return (
+      item &&
+      !item.parentColumnId &&
+      item.kind !== "column" &&
+      item.kind !== "drawing" &&
+      item.kind !== "line"
+    );
+  });
+
+  const openItemContextMenu = (clientX: number, clientY: number, itemId: string) => {
+    if (!selectedIds.includes(itemId)) {
+      onSelect(itemId, false);
+    }
+    setContextMenu({ x: clientX, y: clientY });
+  };
+
+  const idsInMarquee = useCallback(
+    (box: { x1: number; y1: number; x2: number; y2: number }) => {
+      const left = Math.min(box.x1, box.x2);
+      const right = Math.max(box.x1, box.x2);
+      const top = Math.min(box.y1, box.y2);
+      const bottom = Math.max(box.y1, box.y2);
+      return canvasItems
+        .filter(
+          (item) =>
+            !item.parentColumnId &&
+            !item.inUnsorted &&
+            item.x < right &&
+            item.x + item.width > left &&
+            item.y < bottom &&
+            item.y + item.height > top,
+        )
+        .map((item) => item.id);
+    },
+    [canvasItems],
+  );
+
+  const startMarquee = (event: React.PointerEvent<SVGElement>) => {
+    if (mode !== "select" || placementKind || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const start = toWorld(event.clientX, event.clientY);
+    setMarquee({ x1: start.x, y1: start.y, x2: start.x, y2: start.y });
+
+    const move = (moveEvent: PointerEvent) => {
+      const current = toWorld(moveEvent.clientX, moveEvent.clientY);
+      setMarquee({ x1: start.x, y1: start.y, x2: current.x, y2: current.y });
+    };
+
+    const stop = (upEvent: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      const end = toWorld(upEvent.clientX, upEvent.clientY);
+      const box = { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+      const moved =
+        Math.hypot(end.x - start.x, end.y - start.y) > 6 / cameraRef.current.zoom;
+      if (moved) {
+        onSelectMany(idsInMarquee(box));
+      } else {
+        onSelect(null);
+      }
+      setMarquee(null);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+  };
 
   const updateDropHint = useCallback((clientX: number, clientY: number) => {
     setColumnDropHint(findColumnDrop(clientX, clientY));
@@ -135,7 +222,7 @@ export function CanvasView({
 
       if (drop) {
         onMoveItemToColumn(itemId, drop.columnId, drop.index);
-        onSelect(itemId);
+        onSelect(itemId, false);
         return true;
       }
 
@@ -146,7 +233,7 @@ export function CanvasView({
           x: position.x - PLACE_OFFSET.x,
           y: position.y - PLACE_OFFSET.y,
         });
-        onSelect(itemId);
+        onSelect(itemId, false);
         return true;
       }
 
@@ -162,14 +249,14 @@ export function CanvasView({
     if (drop && kind !== "column") {
       const id = onCreate(kind, { x: 0, y: 0 });
       onMoveItemToColumn(id, drop.columnId, drop.index);
-      onSelect(id);
+      onSelect(id, false);
     } else {
       const position = toWorld(clientX, clientY);
       const id = onCreate(kind, {
         x: position.x - PLACE_OFFSET.x,
         y: position.y - PLACE_OFFSET.y,
       });
-      onSelect(id);
+      onSelect(id, false);
     }
 
     onPlacementKind(null);
@@ -272,7 +359,7 @@ export function CanvasView({
       setDraftPoints([]);
       if (points.length >= 2) {
         const id = onCreateDrawing(points);
-        onSelect(id);
+        onSelect(id, false);
       }
       onModeChange("select");
     };
@@ -343,7 +430,7 @@ export function CanvasView({
         if (columnDrop) {
           onMoveItemToColumn(id, columnDrop.columnId, columnDrop.index + offset);
         }
-        onSelect(id);
+        onSelect(id, false);
         offset += 1;
         onModeChange("select");
         onPlacementKind(null);
@@ -415,7 +502,21 @@ export function CanvasView({
           transform: `translate3d(${liveCamera.x}px, ${liveCamera.y}px, 0) scale(${liveCamera.zoom})`,
         }}
       >
-        <svg className="connection-layer" width="10000" height="10000">
+        <svg
+          className="connection-layer"
+          width="10000"
+          height="10000"
+          onPointerDown={startMarquee}
+        >
+          {marquee ? (
+            <rect
+              className="marquee-rect"
+              x={Math.min(marquee.x1, marquee.x2)}
+              y={Math.min(marquee.y1, marquee.y2)}
+              width={Math.abs(marquee.x2 - marquee.x1)}
+              height={Math.abs(marquee.y2 - marquee.y1)}
+            />
+          ) : null}
           {draftPoints.length > 1 ? (
             <path
               className="drawing-draft"
@@ -435,8 +536,9 @@ export function CanvasView({
               key={item.id}
               item={item}
               zoom={liveCamera.zoom}
-              selected={selectedId === item.id}
-              onSelect={() => onSelect(item.id)}
+              selected={selectedIds.includes(item.id)}
+              onSelect={(additive) => onSelect(item.id, additive)}
+              onContextMenu={(x, y) => openItemContextMenu(x, y, item.id)}
               onMove={(x, y) => onUpdate(item.id, { x, y })}
               onUpdate={(changes) => onUpdate(item.id, changes)}
               onDelete={() => {
@@ -450,8 +552,9 @@ export function CanvasView({
               key={item.id}
               item={item}
               zoom={liveCamera.zoom}
-              selected={selectedId === item.id}
-              onSelect={() => onSelect(item.id)}
+              selected={selectedIds.includes(item.id)}
+              onSelect={(additive) => onSelect(item.id, additive)}
+              onContextMenu={(x, y) => openItemContextMenu(x, y, item.id)}
               onMove={(x, y) => onUpdate(item.id, { x, y })}
               onResize={(width, height) => onUpdate(item.id, { width, height })}
               onUpdate={(changes) => onUpdate(item.id, changes)}
@@ -476,13 +579,13 @@ export function CanvasView({
               (entry) => entry.parentColumnId === column.id,
             )}
             zoom={liveCamera.zoom}
-            selectedId={selectedId}
+            selectedIds={selectedIds}
             dropHint={
               columnDropHint?.columnId === column.id
                 ? columnDropHint.index
                 : null
             }
-            onSelect={() => onSelect(column.id)}
+            onSelect={() => onSelect(column.id, false)}
             onMove={(x, y) => onUpdate(column.id, { x, y })}
             onResize={(width, height) =>
               onUpdate(column.id, { width, height })
@@ -497,7 +600,7 @@ export function CanvasView({
               onDelete(id);
               onSelect(null);
             }}
-            onChildSelect={(id) => onSelect(id)}
+            onChildSelect={(id, additive) => onSelect(id, additive)}
             onItemDragFinish={handleItemDragFinish}
             onEnterBoard={onEnterBoard}
           />
@@ -577,6 +680,32 @@ export function CanvasView({
         >
           {placementKind}
         </div>
+      ) : null}
+
+      {selectedIds.length > 1 ? (
+        <div className="connect-hint">
+          {groupableSelectedIds.length >= 2
+            ? "Clic derecho → Agrupar en columna"
+            : `${selectedIds.length} seleccionados`}
+        </div>
+      ) : null}
+
+      {contextMenu ? (
+        <CanvasContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          canGroup={groupableSelectedIds.length >= 2}
+          onGroupIntoColumn={() => {
+            onGroupIntoColumn(groupableSelectedIds);
+            setContextMenu(null);
+          }}
+          onDelete={() => {
+            for (const id of selectedIds) onDelete(id);
+            onSelect(null);
+            setContextMenu(null);
+          }}
+          onClose={() => setContextMenu(null)}
+        />
       ) : null}
     </section>
   );

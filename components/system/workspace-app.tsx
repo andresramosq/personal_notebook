@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
 import { Icon } from "@/components/system/icon";
 import { TrashPanel } from "@/components/system/trash-panel";
@@ -10,14 +10,32 @@ import type { CanvasMode, ItemKind } from "@/lib/workspace/types";
 
 export function WorkspaceApp() {
   const workspace = useWorkspace();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [mode, setMode] = useState<CanvasMode>("select");
   const [placementKind, setPlacementKind] = useState<ItemKind | null>(null);
   const [query, setQuery] = useState("");
   const [trashOpen, setTrashOpen] = useState(false);
   const [unsortedOpen, setUnsortedOpen] = useState(false);
 
-  const deleteItem = workspace.deleteItem;
+  const handleSelect = useCallback((id: string | null, additive = false) => {
+    if (!id) {
+      setSelectedIds([]);
+      return;
+    }
+    if (additive) {
+      setSelectedIds((current) =>
+        current.includes(id)
+          ? current.filter((entry) => entry !== id)
+          : [...current, id],
+      );
+      return;
+    }
+    setSelectedIds([id]);
+  }, []);
+
+  const handleSelectMany = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -27,21 +45,21 @@ export function WorkspaceApp() {
 
       if (event.key === "Escape") {
         setPlacementKind(null);
-        setSelectedId(null);
+        setSelectedIds([]);
         setMode("select");
         return;
       }
 
       if (
         !editing &&
-        selectedId &&
+        selectedIds.length === 1 &&
         (event.metaKey || event.ctrlKey) &&
         event.key === "Enter"
       ) {
-        const item = workspace.items.find((entry) => entry.id === selectedId);
+        const item = workspace.items.find((entry) => entry.id === selectedIds[0]);
         if (item?.kind === "column") {
-          const nextId = workspace.duplicateItem(selectedId);
-          setSelectedId(nextId);
+          const nextId = workspace.duplicateItem(selectedIds[0]);
+          setSelectedIds([nextId]);
           event.preventDefault();
           return;
         }
@@ -49,17 +67,19 @@ export function WorkspaceApp() {
 
       if (
         !editing &&
-        selectedId &&
+        selectedIds.length > 0 &&
         (event.key === "Delete" || event.key === "Backspace")
       ) {
-        deleteItem(selectedId);
-        setSelectedId(null);
+        for (const id of selectedIds) {
+          workspace.deleteItem(id);
+        }
+        setSelectedIds([]);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [deleteItem, selectedId, workspace]);
+  }, [selectedIds, workspace]);
 
   const visibleItems = useMemo(() => {
     const value = query.trim().toLocaleLowerCase();
@@ -144,13 +164,14 @@ export function WorkspaceApp() {
           key={workspace.activeCanvas.id}
           items={visibleItems}
           camera={camera}
-          selectedId={selectedId}
+          selectedIds={selectedIds}
           mode={mode}
           placementKind={placementKind}
           onModeChange={setMode}
           onPlacementKind={setPlacementKind}
           onCameraChange={workspace.updateCamera}
-          onSelect={setSelectedId}
+          onSelect={handleSelect}
+          onSelectMany={handleSelectMany}
           onCreate={workspace.createItem}
           onCreateUploaded={workspace.createUploadedItem}
           onCreateDrawing={workspace.createDrawing}
@@ -159,15 +180,19 @@ export function WorkspaceApp() {
           onUpdate={workspace.updateItem}
           onMoveItemToColumn={workspace.moveItemToColumn}
           onMoveItemToCanvas={workspace.moveItemToCanvas}
+          onGroupIntoColumn={(ids) => {
+            const columnId = workspace.groupIntoColumn(ids);
+            if (columnId) setSelectedIds([columnId]);
+          }}
           onDelete={workspace.deleteItem}
           onDuplicate={(id) => {
             const nextId = workspace.duplicateItem(id);
-            setSelectedId(nextId);
+            setSelectedIds([nextId]);
             return nextId;
           }}
           onEnterBoard={(item) => {
             if (item.nestedCanvasId) {
-              setSelectedId(null);
+              setSelectedIds([]);
               setPlacementKind(null);
               workspace.enterCanvas(item.nestedCanvasId);
             }

@@ -19,7 +19,8 @@ type ObjectCardProps = {
   zoom: number;
   selected: boolean;
   nestedPreview?: CanvasItem[];
-  onSelect: () => void;
+  onSelect: (additive?: boolean) => void;
+  onContextMenu?: (clientX: number, clientY: number) => void;
   onMove: (x: number, y: number) => void;
   onResize: (width: number, height: number) => void;
   onUpdate: (changes: Partial<CanvasItem>) => void;
@@ -49,6 +50,7 @@ export const ObjectCard = memo(function ObjectCard({
   selected,
   nestedPreview = [],
   onSelect,
+  onContextMenu,
   onMove,
   onResize,
   onUpdate,
@@ -116,7 +118,6 @@ export const ObjectCard = memo(function ObjectCard({
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
-    onSelect();
     setIsDragging(true);
 
     const start = { x: event.clientX, y: event.clientY };
@@ -200,9 +201,14 @@ export const ObjectCard = memo(function ObjectCard({
               height: item.height,
             }
       }
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onContextMenu?.(event.clientX, event.clientY);
+      }}
       onPointerDown={(event) => {
         event.stopPropagation();
-        onSelect();
+        onSelect(event.shiftKey);
         if (event.button !== 0) return;
         if (item.kind === "drawing" || item.kind === "line") return;
         const target = event.target as HTMLElement;

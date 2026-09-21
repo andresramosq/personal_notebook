@@ -859,6 +859,83 @@ export function useWorkspace() {
     setState(createInitialWorkspace());
   }, []);
 
+  const groupIntoColumn = (itemIds: string[]) => {
+    if (itemIds.length < 2 || !state?.activeCanvasId) return "";
+
+    const columnId = createId();
+    update((current) => {
+      const picked = itemIds
+        .map((itemId) => current.items.find((item) => item.id === itemId))
+        .filter((item): item is CanvasItem => {
+          if (!item) return false;
+          return (
+            item.kind !== "column" &&
+            item.kind !== "drawing" &&
+            item.kind !== "line" &&
+            !item.parentColumnId
+          );
+        });
+
+      if (picked.length < 2) return current;
+
+      const minX = Math.min(...picked.map((item) => item.x));
+      const minY = Math.min(...picked.map((item) => item.y));
+      const now = Date.now();
+      const sorted = [...picked].sort(
+        (a, b) => a.y - b.y || a.x - b.x,
+      );
+      const orderById = new Map(
+        sorted.map((item, sortOrder) => [item.id, sortOrder]),
+      );
+
+      const column: CanvasItem = {
+        id: columnId,
+        canvasId: current.activeCanvasId,
+        kind: "column",
+        title: "Columna",
+        content: createDefaultColumnContent(),
+        url: "",
+        caption: "",
+        nestedCanvasId: null,
+        parentColumnId: null,
+        sortOrder: 0,
+        inUnsorted: false,
+        databaseFields: [],
+        databaseRecords: [],
+        points: [],
+        strokeColor: "#292929",
+        strokeWidth: 2,
+        x: minX,
+        y: minY,
+        width: 280,
+        height: Math.max(320, sorted.length * 120 + 80),
+        color: "white",
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      return {
+        ...current,
+        items: [
+          ...current.items.map((item) => {
+            const sortOrder = orderById.get(item.id);
+            if (sortOrder === undefined) return item;
+            return {
+              ...item,
+              parentColumnId: columnId,
+              sortOrder,
+              inUnsorted: false,
+              updatedAt: now,
+            };
+          }),
+          column,
+        ],
+      };
+    });
+
+    return columnId;
+  };
+
   return {
     state,
     activeCanvas,
@@ -882,6 +959,7 @@ export function useWorkspace() {
     updateItem,
     moveItemToColumn,
     moveItemToCanvas,
+    groupIntoColumn,
     deleteItem,
     restoreFromTrash,
     purgeFromTrash,

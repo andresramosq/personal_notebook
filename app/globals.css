@@ -1267,6 +1267,17 @@ button {
   margin-bottom: 8px;
 }
 
+.marquee-rect {
+  fill: rgb(91 91 214 / 12%);
+  stroke: var(--accent);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.connection-layer {
+  pointer-events: all;
+}
+
 .item-content {
   display: flex;
   width: 100%;
