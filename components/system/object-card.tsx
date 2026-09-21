@@ -26,7 +26,12 @@ type ObjectCardProps = {
   onDelete: () => void;
   onEnterBoard: () => void;
   embedded?: boolean;
-  onPrepareDrag?: (event: React.DragEvent<HTMLElement>) => void;
+  onDragMove?: (clientX: number, clientY: number) => void;
+  onDragFinish?: (
+    clientX: number,
+    clientY: number,
+    draftPosition?: { x: number; y: number },
+  ) => boolean;
 };
 
 const COLORS: ItemColor[] = [
@@ -50,8 +55,10 @@ export const ObjectCard = memo(function ObjectCard({
   onDelete,
   onEnterBoard,
   embedded = false,
-  onPrepareDrag,
+  onDragMove,
+  onDragFinish,
 }: ObjectCardProps) {
+  const [isDragging, setIsDragging] = useState(false);
   const noteRef = useRef<HTMLTextAreaElement>(null);
   const [position, setPosition] = useState({ x: item.x, y: item.y });
   const positionRef = useRef(position);
@@ -106,14 +113,18 @@ export const ObjectCard = memo(function ObjectCard({
   }, [item.x, item.y]);
 
   const startDrag = (event: React.PointerEvent<HTMLElement>) => {
-    if (embedded || event.button !== 0) return;
+    if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect();
+    setIsDragging(true);
 
     const start = { x: event.clientX, y: event.clientY };
-    const origin = positionRef.current;
+    const origin = embedded ? null : positionRef.current;
+
     const move = (moveEvent: PointerEvent) => {
+      onDragMove?.(moveEvent.clientX, moveEvent.clientY);
+      if (embedded || !origin) return;
       const next = {
         x: origin.x + (moveEvent.clientX - start.x) / zoom,
         y: origin.y + (moveEvent.clientY - start.y) / zoom,
@@ -121,10 +132,26 @@ export const ObjectCard = memo(function ObjectCard({
       positionRef.current = next;
       setPosition(next);
     };
-    const stop = () => {
+
+    const stop = (upEvent: PointerEvent) => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", stop);
-      onMove(positionRef.current.x, positionRef.current.y);
+      setIsDragging(false);
+
+      const handled = onDragFinish?.(
+        upEvent.clientX,
+        upEvent.clientY,
+        embedded ? undefined : positionRef.current,
+      );
+
+      if (!handled && !embedded && origin) {
+        onMove(positionRef.current.x, positionRef.current.y);
+      }
+
+      if (handled && !embedded && origin) {
+        positionRef.current = origin;
+        setPosition(origin);
+      }
     };
 
     window.addEventListener("pointermove", move);
@@ -156,7 +183,9 @@ export const ObjectCard = memo(function ObjectCard({
         selected ? "is-selected" : ""
       } ${
         item.kind === "line" || item.kind === "drawing" ? "item-stroke" : ""
-      } ${embedded ? "canvas-item-embedded" : ""}`}
+      } ${embedded ? "canvas-item-embedded" : ""} ${
+        isDragging ? "is-dragging" : ""
+      }`}
       style={
         embedded
           ? { width: "100%", minHeight: item.height }
@@ -166,8 +195,6 @@ export const ObjectCard = memo(function ObjectCard({
               height: item.height,
             }
       }
-      draggable={Boolean(onPrepareDrag)}
-      onDragStart={onPrepareDrag}
       onPointerDown={(event) => {
         event.stopPropagation();
         onSelect();
@@ -227,8 +254,11 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
-      {!embedded && item.kind !== "drawing" && item.kind !== "line" ? (
-        <div className="item-drag-area" onPointerDown={startDrag} />
+      {item.kind !== "drawing" && item.kind !== "line" ? (
+        <div
+          className={`item-drag-area ${embedded ? "item-drag-area-embedded" : ""}`}
+          onPointerDown={startDrag}
+        />
       ) : !embedded ? (
         <div
           className="drawing-drag-area"

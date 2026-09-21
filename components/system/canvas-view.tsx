@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardCard } from "@/components/system/board-card";
 import { ColumnCard } from "@/components/system/column-card";
 import { CanvasPalette } from "@/components/system/canvas-palette";
 import { CanvasSelectionBar } from "@/components/system/canvas-selection-bar";
 import { ObjectCard } from "@/components/system/object-card";
 import { uploadBoardFile } from "@/lib/workspace/client-upload";
+import { findColumnDrop } from "@/lib/workspace/column-drop";
 import { drawingPath } from "@/lib/workspace/drawing";
 import type {
   CanvasCamera,
@@ -35,24 +36,21 @@ type CanvasViewProps = {
   trashCount: number;
   onOpenTrash: () => void;
   onUpdate: (id: string, changes: Partial<CanvasItem>) => void;
+  onMoveItemToColumn: (
+    itemId: string,
+    columnId: string,
+    targetIndex: number,
+  ) => void;
+  onMoveItemToCanvas: (
+    itemId: string,
+    position: { x: number; y: number },
+  ) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => string;
   onEnterBoard: (item: CanvasItem) => void;
 };
 
 const DEFAULT_CAMERA: CanvasCamera = { x: 0, y: 0, zoom: 1 };
-const ITEM_KINDS: ItemKind[] = [
-  "note",
-  "image",
-  "link",
-  "todo",
-  "column",
-  "board",
-  "comment",
-  "table",
-  "video",
-];
-
 const PLACE_OFFSET = { x: 130, y: 80 };
 
 export function CanvasView({
@@ -71,6 +69,8 @@ export function CanvasView({
   trashCount,
   onOpenTrash,
   onUpdate,
+  onMoveItemToColumn,
+  onMoveItemToCanvas,
   onDelete,
   onDuplicate,
   onEnterBoard,
@@ -81,6 +81,10 @@ export function CanvasView({
   const [draftPoints, setDraftPoints] = useState<DrawingPoint[]>([]);
   const draftPointsRef = useRef<DrawingPoint[]>([]);
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null);
+  const [columnDropHint, setColumnDropHint] = useState<{
+    columnId: string;
+    index: number;
+  } | null>(null);
 
   useEffect(() => {
     cameraRef.current = camera;
@@ -102,35 +106,100 @@ export function CanvasView({
     };
   };
 
-  const createAtScreen = (clientX: number, clientY: number, kind: ItemKind) => {
-    const position = toWorld(clientX, clientY);
-    const id = onCreate(kind, {
-      x: position.x - PLACE_OFFSET.x,
-      y: position.y - PLACE_OFFSET.y,
-    });
-    onSelect(id);
+  const canvasItems = items.filter((item) => !item.inUnsorted);
+  const columns = canvasItems.filter((item) => item.kind === "column");
+  const rootItems = canvasItems.filter(
+    (item) => !item.parentColumnId && item.kind !== "column",
+  );
+  const selectedItem = selectedId
+    ? canvasItems.find((item) => item.id === selectedId)
+    : undefined;
+
+  const updateDropHint = useCallback((clientX: number, clientY: number) => {
+    setColumnDropHint(findColumnDrop(clientX, clientY));
+  }, []);
+
+  const clearDropHint = useCallback(() => {
+    setColumnDropHint(null);
+  }, []);
+
+  const handleItemDragFinish = useCallback(
+    (
+      itemId: string,
+      clientX: number,
+      clientY: number,
+      draftPosition?: { x: number; y: number },
+    ) => {
+      const drop = findColumnDrop(clientX, clientY);
+      clearDropHint();
+
+      if (drop) {
+        onMoveItemToColumn(itemId, drop.columnId, drop.index);
+        onSelect(itemId);
+        return true;
+      }
+
+      const item = canvasItems.find((entry) => entry.id === itemId);
+      if (item?.parentColumnId) {
+        const position = toWorld(clientX, clientY);
+        onMoveItemToCanvas(itemId, {
+          x: position.x - PLACE_OFFSET.x,
+          y: position.y - PLACE_OFFSET.y,
+        });
+        onSelect(itemId);
+        return true;
+      }
+
+      return false;
+    },
+    [canvasItems, clearDropHint, onMoveItemToCanvas, onMoveItemToColumn, onSelect],
+  );
+
+  const placeNewItem = (clientX: number, clientY: number, kind: ItemKind) => {
+    const drop = findColumnDrop(clientX, clientY);
+    clearDropHint();
+
+    if (drop && kind !== "column") {
+      const id = onCreate(kind, { x: 0, y: 0 });
+      onMoveItemToColumn(id, drop.columnId, drop.index);
+      onSelect(id);
+    } else {
+      const position = toWorld(clientX, clientY);
+      const id = onCreate(kind, {
+        x: position.x - PLACE_OFFSET.x,
+        y: position.y - PLACE_OFFSET.y,
+      });
+      onSelect(id);
+    }
+
     onPlacementKind(null);
     onModeChange("select");
     setGhost(null);
-    return id;
   };
 
   useEffect(() => {
     if (!placementKind) {
       setGhost(null);
+      clearDropHint();
       return;
     }
 
     const move = (event: PointerEvent) => {
       setGhost({ x: event.clientX, y: event.clientY });
+      updateDropHint(event.clientX, event.clientY);
     };
 
     const place = (event: PointerEvent) => {
       const target = event.target as HTMLElement;
       if (target.closest(".canvas-palette")) return;
-      if (target.closest(".canvas-item")) return;
+      if (
+        target.closest(".canvas-item") &&
+        !target.closest("[data-column-body]")
+      ) {
+        return;
+      }
       if (!viewportRef.current?.contains(target)) return;
-      createAtScreen(event.clientX, event.clientY, placementKind);
+      placeNewItem(event.clientX, event.clientY, placementKind);
     };
 
     window.addEventListener("pointermove", move);
@@ -139,7 +208,7 @@ export function CanvasView({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerdown", place);
     };
-  }, [placementKind]);
+  }, [placementKind, clearDropHint, updateDropHint]);
 
   const startPan = (event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 1) return;
@@ -258,42 +327,10 @@ export function CanvasView({
     });
   };
 
-  const canvasItems = items.filter((item) => !item.inUnsorted);
-  const columns = canvasItems.filter((item) => item.kind === "column");
-  const rootItems = canvasItems.filter(
-    (item) => !item.parentColumnId && item.kind !== "column",
-  );
-  const selectedItem = selectedId
-    ? canvasItems.find((item) => item.id === selectedId)
-    : undefined;
-
-  const assignToColumn = (
-    childId: string,
-    columnId: string,
-    sortOrder: number,
-  ) => {
-    onUpdate(childId, {
-      parentColumnId: columnId,
-      sortOrder,
-      inUnsorted: false,
-    });
-  };
-
-  const releaseOnCanvas = (
-    itemId: string,
-    position: { x: number; y: number },
-  ) => {
-    onUpdate(itemId, {
-      parentColumnId: null,
-      inUnsorted: false,
-      x: position.x - PLACE_OFFSET.x,
-      y: position.y - PLACE_OFFSET.y,
-    });
-  };
-
   const importFiles = async (
     files: FileList,
     origin: { x: number; y: number },
+    columnDrop?: { columnId: string; index: number },
   ) => {
     let offset = 0;
     for (const file of Array.from(files)) {
@@ -303,8 +340,11 @@ export function CanvasView({
           x: origin.x + offset,
           y: origin.y + offset,
         });
+        if (columnDrop) {
+          onMoveItemToColumn(id, columnDrop.columnId, columnDrop.index + offset);
+        }
         onSelect(id);
-        offset += 28;
+        offset += 1;
         onModeChange("select");
         onPlacementKind(null);
       } catch (error) {
@@ -335,66 +375,34 @@ export function CanvasView({
       onDoubleClick={(event) => {
         if (mode !== "select" && mode !== "draw") return;
         if (event.target !== event.currentTarget) return;
-        const position = toWorld(event.clientX, event.clientY);
-        const id = onCreate("note", {
-          x: position.x - 140,
-          y: position.y - 100,
-        });
-        onSelect(id);
-        onPlacementKind(null);
+        placeNewItem(event.clientX, event.clientY, "note");
       }}
       onWheel={handleWheel}
       onDragOver={(event) => {
-        if (
-          event.dataTransfer.types.includes("Files") ||
-          event.dataTransfer.types.includes("application/x-libreta-item") ||
-          event.dataTransfer.types.includes("text/plain")
-        ) {
+        if (event.dataTransfer.types.includes("Files")) {
           event.preventDefault();
           event.dataTransfer.dropEffect = "copy";
+          updateDropHint(event.clientX, event.clientY);
         }
       }}
+      onDragLeave={() => clearDropHint()}
       onDrop={(event) => {
         event.preventDefault();
         onPlacementKind(null);
+        clearDropHint();
         const position = toWorld(event.clientX, event.clientY);
+        const columnDrop = findColumnDrop(event.clientX, event.clientY);
 
         if (event.dataTransfer.files.length > 0) {
-          void importFiles(event.dataTransfer.files, {
-            x: position.x - PLACE_OFFSET.x,
-            y: position.y - PLACE_OFFSET.y,
-          });
-          return;
+          void importFiles(
+            event.dataTransfer.files,
+            {
+              x: position.x - PLACE_OFFSET.x,
+              y: position.y - PLACE_OFFSET.y,
+            },
+            columnDrop ?? undefined,
+          );
         }
-
-        const moveId = event.dataTransfer.getData(
-          "application/x-libreta-move-item",
-        );
-        if (moveId) {
-          releaseOnCanvas(moveId, position);
-          onSelect(moveId);
-          return;
-        }
-
-        const unsortedId = event.dataTransfer.getData(
-          "application/x-libreta-unsorted-item",
-        );
-        if (unsortedId) {
-          releaseOnCanvas(unsortedId, position);
-          onSelect(unsortedId);
-          return;
-        }
-
-        const kind = (event.dataTransfer.getData(
-          "application/x-libreta-item",
-        ) || event.dataTransfer.getData("text/plain")) as ItemKind;
-        if (!ITEM_KINDS.includes(kind)) return;
-        const id = onCreate(kind, {
-          x: position.x - PLACE_OFFSET.x,
-          y: position.y - PLACE_OFFSET.y,
-        });
-        onSelect(id);
-        onModeChange("select");
       }}
       style={{
         backgroundPosition: `${liveCamera.x}px ${liveCamera.y}px`,
@@ -443,7 +451,6 @@ export function CanvasView({
               item={item}
               zoom={liveCamera.zoom}
               selected={selectedId === item.id}
-              nestedPreview={[]}
               onSelect={() => onSelect(item.id)}
               onMove={(x, y) => onUpdate(item.id, { x, y })}
               onResize={(width, height) => onUpdate(item.id, { width, height })}
@@ -453,13 +460,10 @@ export function CanvasView({
                 onSelect(null);
               }}
               onEnterBoard={() => onEnterBoard(item)}
-              onPrepareDrag={(event) => {
-                event.dataTransfer.setData(
-                  "application/x-libreta-move-item",
-                  item.id,
-                );
-                event.dataTransfer.effectAllowed = "move";
-              }}
+              onDragMove={updateDropHint}
+              onDragFinish={(clientX, clientY, draftPosition) =>
+                handleItemDragFinish(item.id, clientX, clientY, draftPosition)
+              }
             />
           ),
         )}
@@ -469,10 +473,15 @@ export function CanvasView({
             key={column.id}
             item={column}
             children={canvasItems.filter(
-              (item) => item.parentColumnId === column.id,
+              (entry) => entry.parentColumnId === column.id,
             )}
             zoom={liveCamera.zoom}
             selectedId={selectedId}
+            dropHint={
+              columnDropHint?.columnId === column.id
+                ? columnDropHint.index
+                : null
+            }
             onSelect={() => onSelect(column.id)}
             onMove={(x, y) => onUpdate(column.id, { x, y })}
             onResize={(width, height) =>
@@ -489,15 +498,7 @@ export function CanvasView({
               onSelect(null);
             }}
             onChildSelect={(id) => onSelect(id)}
-            onAssignChild={(childId, sortOrder) =>
-              assignToColumn(childId, column.id, sortOrder)
-            }
-            onCreateInColumn={(kind, sortOrder) => {
-              const position = { x: column.x + 16, y: column.y + 80 };
-              const id = onCreate(kind, position);
-              assignToColumn(id, column.id, sortOrder);
-              onSelect(id);
-            }}
+            onItemDragFinish={handleItemDragFinish}
             onEnterBoard={onEnterBoard}
           />
         ))}
@@ -524,7 +525,7 @@ export function CanvasView({
         }}
       />
 
-      {selectedItem ? (
+      {selectedItem && !selectedItem.parentColumnId ? (
         <div
           className="selection-bar-anchor"
           style={{
@@ -561,7 +562,7 @@ export function CanvasView({
 
       {placementKind ? (
         <div className="connect-hint">
-          Haz clic en el tablero para colocar, o arrastra desde la barra
+          Clic en el tablero o columna para colocar
         </div>
       ) : null}
 

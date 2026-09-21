@@ -1242,6 +1242,23 @@ button {
   cursor: grab;
 }
 
+.item-drag-area-embedded {
+  position: relative;
+  height: 28px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 4%);
+}
+
+.canvas-item.is-dragging {
+  opacity: 0.55;
+}
+
+.column-drop-line-empty {
+  display: block;
+  margin-bottom: 8px;
+}
+
 .item-content {
   display: flex;
   width: 100%;

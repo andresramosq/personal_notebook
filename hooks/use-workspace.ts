@@ -474,6 +474,90 @@ export function useWorkspace() {
     return id;
   };
 
+  const moveItemToColumn = (
+    itemId: string,
+    columnId: string,
+    targetIndex: number,
+  ) => {
+    update((current) => {
+      const item = current.items.find((candidate) => candidate.id === itemId);
+      if (!item || item.kind === "column") return current;
+
+      const siblings = current.items
+        .filter(
+          (candidate) =>
+            candidate.parentColumnId === columnId && candidate.id !== itemId,
+        )
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+
+      const index = Math.max(0, Math.min(targetIndex, siblings.length));
+      siblings.splice(index, 0, item);
+
+      const now = Date.now();
+      const orderById = new Map(
+        siblings.map((candidate, sortOrder) => [candidate.id, sortOrder]),
+      );
+
+      return {
+        ...current,
+        items: current.items.map((candidate) => {
+          const sortOrder = orderById.get(candidate.id);
+          if (sortOrder === undefined) return candidate;
+          return {
+            ...candidate,
+            parentColumnId: columnId,
+            sortOrder,
+            inUnsorted: false,
+            updatedAt: now,
+          };
+        }),
+      };
+    });
+  };
+
+  const moveItemToCanvas = (
+    itemId: string,
+    position: { x: number; y: number },
+  ) => {
+    update((current) => {
+      const item = current.items.find((candidate) => candidate.id === itemId);
+      if (!item) return current;
+
+      const now = Date.now();
+      const columnId = item.parentColumnId;
+
+      let nextItems = current.items.map((candidate) =>
+        candidate.id === itemId
+          ? {
+              ...candidate,
+              parentColumnId: null,
+              inUnsorted: false,
+              x: position.x,
+              y: position.y,
+              updatedAt: now,
+            }
+          : candidate,
+      );
+
+      if (columnId) {
+        const remaining = nextItems
+          .filter(
+            (candidate) =>
+              candidate.parentColumnId === columnId && candidate.id !== itemId,
+          )
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        nextItems = nextItems.map((candidate) => {
+          if (candidate.parentColumnId !== columnId) return candidate;
+          const idx = remaining.findIndex((entry) => entry.id === candidate.id);
+          if (idx === -1) return candidate;
+          return { ...candidate, sortOrder: idx, updatedAt: now };
+        });
+      }
+
+      return { ...current, items: nextItems };
+    });
+  };
+
   const updateItem = (id: string, changes: Partial<CanvasItem>) => {
     update((current) => {
       const item = current.items.find((candidate) => candidate.id === id);
@@ -796,6 +880,8 @@ export function useWorkspace() {
     createLine,
     duplicateItem,
     updateItem,
+    moveItemToColumn,
+    moveItemToCanvas,
     deleteItem,
     restoreFromTrash,
     purgeFromTrash,

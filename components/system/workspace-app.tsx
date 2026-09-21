@@ -157,6 +157,8 @@ export function WorkspaceApp() {
           trashCount={workspace.trash.length}
           onOpenTrash={() => setTrashOpen(true)}
           onUpdate={workspace.updateItem}
+          onMoveItemToColumn={workspace.moveItemToColumn}
+          onMoveItemToCanvas={workspace.moveItemToCanvas}
           onDelete={workspace.deleteItem}
           onDuplicate={(id) => {
             const nextId = workspace.duplicateItem(id);
