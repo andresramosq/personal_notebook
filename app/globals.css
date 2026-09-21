@@ -551,6 +551,14 @@ button {
   pointer-events: none;
 }
 
+.canvas-item:not(.canvas-item-embedded):not(.item-stroke) {
+  cursor: grab;
+}
+
+.canvas-item.is-dragging {
+  cursor: grabbing;
+}
+
 .canvas-item {
   position: absolute;
   top: 0;

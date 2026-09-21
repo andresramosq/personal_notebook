@@ -158,6 +158,11 @@ export const ObjectCard = memo(function ObjectCard({
     window.addEventListener("pointerup", stop, { once: true });
   };
 
+  const canStartDrag = (target: HTMLElement) =>
+    !target.closest(
+      "input, textarea, button, select, a, .block-table, .block-todo, .block-comment, .item-actions",
+    );
+
   const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -198,6 +203,14 @@ export const ObjectCard = memo(function ObjectCard({
       onPointerDown={(event) => {
         event.stopPropagation();
         onSelect();
+        if (event.button !== 0) return;
+        if (item.kind === "drawing" || item.kind === "line") return;
+        const target = event.target as HTMLElement;
+        if (embedded) {
+          if (target.closest(".item-drag-area-embedded")) startDrag(event);
+          return;
+        }
+        if (canStartDrag(target)) startDrag(event);
       }}
       onDoubleClick={(event) => {
         event.stopPropagation();
@@ -254,12 +267,10 @@ export const ObjectCard = memo(function ObjectCard({
         </div>
       ) : null}
 
-      {item.kind !== "drawing" && item.kind !== "line" ? (
-        <div
-          className={`item-drag-area ${embedded ? "item-drag-area-embedded" : ""}`}
-          onPointerDown={startDrag}
-        />
-      ) : !embedded ? (
+      {embedded && item.kind !== "drawing" && item.kind !== "line" ? (
+        <div className="item-drag-area item-drag-area-embedded" aria-hidden />
+      ) : null}
+      {!embedded && (item.kind === "drawing" || item.kind === "line") ? (
         <div
           className="drawing-drag-area"
           onPointerDown={(event) => {
