@@ -84,14 +84,17 @@ export const BoardCard = memo(function BoardCard({
           event.stopPropagation();
           onEnterBoard();
         }}
-        onContextMenu={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onSelect();
-          setMenu({ x: event.clientX, y: event.clientY });
-        }}
       >
-        <div className="board-card" onPointerDown={startDrag}>
+        <div
+          className="board-card"
+          onPointerDown={startDrag}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onSelect();
+            setMenu({ x: event.clientX, y: event.clientY });
+          }}
+        >
           <span className={`board-color-swatch color-${item.color}`} />
           {renaming ? (
             <input

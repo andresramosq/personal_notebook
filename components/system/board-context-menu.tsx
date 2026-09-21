@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ItemColor } from "@/lib/workspace/types";
 
 const BOARD_COLORS: ItemColor[] = [
@@ -32,9 +33,17 @@ export function BoardContextMenu({
   onClose,
 }: BoardContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
     const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
       if (menuRef.current?.contains(event.target as Node)) return;
       onClose();
     };
@@ -42,15 +51,21 @@ export function BoardContextMenu({
       if (event.key === "Escape") onClose();
     };
 
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
+    const timer = window.setTimeout(() => {
+      window.addEventListener("pointerdown", handlePointerDown);
+      window.addEventListener("keydown", handleKeyDown);
+    }, 0);
+
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [mounted, onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       ref={menuRef}
       className="board-context-menu"
@@ -78,6 +93,7 @@ export function BoardContextMenu({
           />
         ))}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
