@@ -68,6 +68,13 @@ button {
     240px minmax(0, 1fr);
 }
 
+.system-shell-minimal {
+  grid-template:
+    "header" 58px
+    "content" minmax(0, 1fr) /
+    minmax(0, 1fr);
+}
+
 .app-sidebar {
   z-index: 60;
   grid-area: sidebar;

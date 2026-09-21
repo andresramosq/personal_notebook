@@ -9,6 +9,7 @@ import type {
 
 const STORAGE_KEY = "libreta:workspace:v1";
 const DEFAULT_CAMERA = { x: 0, y: 0, zoom: 1 };
+const MAIN_SPACE_NAME = "Mi pizarra";
 
 export function hasLocalWorkspace() {
   return (
@@ -17,14 +18,35 @@ export function hasLocalWorkspace() {
   );
 }
 
+export function createDefaultMainSpace(now = Date.now()): {
+  canvas: WorkspaceCanvas;
+  activeCanvasId: string;
+  cameras: WorkspaceState["cameras"];
+} {
+  const canvasId = createId();
+  return {
+    activeCanvasId: canvasId,
+    canvas: {
+      id: canvasId,
+      name: MAIN_SPACE_NAME,
+      parentId: null,
+      createdAt: now,
+      updatedAt: now,
+    },
+    cameras: { [canvasId]: DEFAULT_CAMERA },
+  };
+}
+
 export function createInitialWorkspace(): WorkspaceState {
+  const now = Date.now();
+  const main = createDefaultMainSpace(now);
   return {
     version: 3,
-    activeCanvasId: "",
-    canvases: [],
+    activeCanvasId: main.activeCanvasId,
+    canvases: [main.canvas],
     items: [],
     links: [],
-    cameras: {},
+    cameras: main.cameras,
     trash: [],
   };
 }
@@ -153,7 +175,7 @@ function migrateLegacyWorkspace(
     .map((object): CanvasItem => ({
       id: object.id || createId(),
       canvasId: object.spaceId,
-      kind: object.kind === "text" ? "text" : "note",
+      kind: object.kind === "board" ? "board" : "note",
       title: object.title ?? "",
       content: object.description ?? "",
       url: "",
@@ -165,8 +187,8 @@ function migrateLegacyWorkspace(
       strokeWidth: 2,
       x: object.x ?? 120,
       y: object.y ?? 120,
-      width: object.width ?? (object.kind === "text" ? 260 : 280),
-      height: object.height ?? (object.kind === "text" ? 90 : 190),
+      width: object.width ?? 280,
+      height: object.height ?? 190,
       color: migrateColor(object.color),
       createdAt: object.createdAt ?? now,
       updatedAt: object.updatedAt ?? now,
@@ -185,11 +207,12 @@ function migrateLegacyWorkspace(
     cameras: Object.fromEntries(
       canvases.map((canvas) => [canvas.id, DEFAULT_CAMERA]),
     ),
+    trash: [],
     activeCanvasId,
   };
 }
 
-function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceState {
+export function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceState {
   const now = Date.now();
   let canvases = Array.isArray(state.canvases)
     ? state.canvases
@@ -203,13 +226,16 @@ function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceState {
         }))
     : [];
 
+  if (!canvases.some((canvas) => canvas.parentId === null)) {
+    const main = createDefaultMainSpace(now);
+    canvases = [main.canvas, ...canvases];
+  }
+
   const canvasIds = new Set(canvases.map((canvas) => canvas.id));
   const activeCanvasId = canvasIds.has(state.activeCanvasId ?? "")
     ? state.activeCanvasId!
-    : canvases.length
-      ? (canvases.find((canvas) => canvas.parentId === null)?.id ??
-        canvases[0].id)
-      : "";
+    : (canvases.find((canvas) => canvas.parentId === null)?.id ??
+      canvases[0].id);
 
   const cameras = { ...(state.cameras ?? {}) };
   for (const canvas of canvases) {
@@ -305,8 +331,9 @@ function normalizeItem(
 }
 
 function migrateKind(kind?: string): ItemKind {
-  if (kind === "text") return "text";
   if (kind === "board") return "board";
+  if (kind === "note") return "note";
+  if (kind === "text") return "text";
   if (kind === "link") return "link";
   if (kind === "image") return "image";
   if (kind === "database") return "database";
@@ -315,49 +342,22 @@ function migrateKind(kind?: string): ItemKind {
   if (kind === "kanban") return "kanban";
   if (kind === "comment") return "comment";
   if (kind === "line") return "line";
-  return "note";
+  return "board";
 }
 
 function defaultTitle(kind: ItemKind) {
-  if (kind === "board") return "Pizarra anidada";
-  if (kind === "link") return "Enlace";
-  if (kind === "image") return "Imagen";
-  if (kind === "database") return "Base de datos";
-  if (kind === "drawing") return "";
-  if (kind === "todo") return "To-do";
-  if (kind === "kanban") return "Tablero";
-  if (kind === "comment") return "";
-  if (kind === "line") return "";
-  if (kind === "text") return "";
-  return "Nueva nota";
+  if (kind === "board") return "Pizarra";
+  return "Pizarra";
 }
 
 function defaultWidth(kind: ItemKind) {
-  if (kind === "text") return 280;
   if (kind === "board") return 260;
-  if (kind === "link") return 240;
-  if (kind === "image") return 220;
-  if (kind === "database") return 420;
-  if (kind === "drawing") return 120;
-  if (kind === "todo") return 260;
-  if (kind === "kanban") return 480;
-  if (kind === "comment") return 220;
-  if (kind === "line") return 120;
-  return 280;
+  return 260;
 }
 
 function defaultHeight(kind: ItemKind) {
-  if (kind === "text") return 90;
   if (kind === "board") return 180;
-  if (kind === "link") return 110;
-  if (kind === "image") return 160;
-  if (kind === "database") return 240;
-  if (kind === "drawing") return 80;
-  if (kind === "todo") return 180;
-  if (kind === "kanban") return 280;
-  if (kind === "comment") return 120;
-  if (kind === "line") return 40;
-  return 200;
+  return 180;
 }
 
 function migrateColor(value?: string): ItemColor {

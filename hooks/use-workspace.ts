@@ -11,6 +11,7 @@ import {
   createInitialWorkspace,
   hasLocalWorkspace,
   loadWorkspace,
+  normalizeWorkspace,
   saveWorkspace,
 } from "@/lib/workspace/storage";
 import type { DrawingPoint } from "@/lib/workspace/types";

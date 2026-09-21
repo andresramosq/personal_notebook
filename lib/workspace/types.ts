@@ -10,7 +10,7 @@ export type ItemKind =
   | "kanban"
   | "comment"
   | "line";
-export type CanvasMode = "select" | "hand" | "connect" | "draw" | "line";
+export type CanvasMode = "select" | "hand";
 export type ItemColor = "white" | "sand" | "yellow" | "blue" | "green" | "rose";
 export type DatabaseFieldType =
   | "text"
