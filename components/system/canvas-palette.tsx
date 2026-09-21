@@ -9,9 +9,6 @@ type CanvasPaletteProps = {
 export function CanvasPalette({ onAddBoard }: CanvasPaletteProps) {
   return (
     <aside className="canvas-palette canvas-palette-minimal">
-      <div className="canvas-palette-brand">
-        <span className="app-logo">L</span>
-      </div>
       <div className="canvas-palette-tools">
         <button
           type="button"
