@@ -346,17 +346,17 @@ function migrateKind(kind?: string): ItemKind {
 }
 
 function defaultTitle(kind: ItemKind) {
-  if (kind === "board") return "Tablero";
+  if (kind === "board") return "Nuevo tablero";
   return "Tablero";
 }
 
 function defaultWidth(kind: ItemKind) {
-  if (kind === "board") return 260;
+  if (kind === "board") return 200;
   return 260;
 }
 
 function defaultHeight(kind: ItemKind) {
-  if (kind === "board") return 180;
+  if (kind === "board") return 44;
   return 180;
 }
 

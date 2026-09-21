@@ -4,12 +4,9 @@ import { useEffect, useState } from "react";
 import { CanvasView } from "@/components/system/canvas-view";
 import { Icon } from "@/components/system/icon";
 import { useWorkspace } from "@/hooks/use-workspace";
-import type { CanvasMode } from "@/lib/workspace/types";
-
 export function WorkspaceApp() {
   const workspace = useWorkspace();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<CanvasMode>("select");
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -17,11 +14,8 @@ export function WorkspaceApp() {
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement;
 
-      if (!editing && event.key.toLowerCase() === "v") setMode("select");
-      if (!editing && event.key.toLowerCase() === "h") setMode("hand");
       if (event.key === "Escape") {
         setSelectedId(null);
-        setMode("select");
       }
       if (
         !editing &&
@@ -87,25 +81,17 @@ export function WorkspaceApp() {
           items={workspace.items}
           camera={camera}
           selectedId={selectedId}
-          mode={mode}
-          onModeChange={setMode}
           onCameraChange={workspace.updateCamera}
           onSelect={setSelectedId}
           onCreate={workspace.createItem}
           onUpdate={workspace.updateItem}
           onDelete={workspace.deleteItem}
-          onDuplicate={(id) => {
-            const nextId = workspace.duplicateItem(id);
-            setSelectedId(nextId);
-            return nextId;
-          }}
           onEnterBoard={(item) => {
             if (item.nestedCanvasId) {
               setSelectedId(null);
               workspace.enterCanvas(item.nestedCanvasId);
             }
           }}
-          getNestedPreview={workspace.getNestedPreview}
         />
       </section>
     </main>

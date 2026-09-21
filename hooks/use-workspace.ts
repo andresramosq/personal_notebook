@@ -260,7 +260,7 @@ export function useWorkspace() {
         ...extraCanvases,
         {
           id: nestedCanvasId,
-          name: "Tablero anidado",
+          name: "Nuevo tablero",
           parentId: state.activeCanvasId,
           createdAt: now,
           updatedAt: now,
@@ -315,13 +315,15 @@ export function useWorkspace() {
       width: defaultItemWidth(kind),
       height: defaultItemHeight(kind),
       color:
-        kind === "note"
-          ? "yellow"
-          : kind === "comment"
-            ? "sand"
-            : kind === "kanban"
-              ? "blue"
-              : "white",
+        kind === "board"
+          ? "sand"
+          : kind === "note"
+            ? "yellow"
+            : kind === "comment"
+              ? "sand"
+              : kind === "kanban"
+                ? "blue"
+                : "white",
       createdAt: now,
       updatedAt: now,
     };
@@ -376,12 +378,33 @@ export function useWorkspace() {
   };
 
   const updateItem = (id: string, changes: Partial<CanvasItem>) => {
-    update((current) => ({
-      ...current,
-      items: current.items.map((item) =>
-        item.id === id ? { ...item, ...changes, updatedAt: Date.now() } : item,
-      ),
-    }));
+    update((current) => {
+      const item = current.items.find((candidate) => candidate.id === id);
+      const nextItems = current.items.map((candidate) =>
+        candidate.id === id
+          ? { ...candidate, ...changes, updatedAt: Date.now() }
+          : candidate,
+      );
+
+      const nextTitle = changes.title;
+      if (
+        item?.kind === "board" &&
+        item.nestedCanvasId &&
+        typeof nextTitle === "string"
+      ) {
+        return {
+          ...current,
+          items: nextItems,
+          canvases: current.canvases.map((canvas) =>
+            canvas.id === item.nestedCanvasId
+              ? { ...canvas, name: nextTitle, updatedAt: Date.now() }
+              : canvas,
+          ),
+        };
+      }
+
+      return { ...current, items: nextItems };
+    });
   };
 
   const createDrawing = (worldPoints: DrawingPoint[]) => {
@@ -437,7 +460,7 @@ export function useWorkspace() {
           ...extraCanvases,
           {
             id: nestedCanvasId,
-            name: `${item.title || "Tablero anidado"} (copia)`,
+            name: `${item.title || "Nuevo tablero"} (copia)`,
             parentId: item.canvasId,
             createdAt: now,
             updatedAt: now,
@@ -661,7 +684,7 @@ export function useWorkspace() {
 }
 
 function defaultItemTitle(kind: ItemKind) {
-  if (kind === "board") return "Tablero anidado";
+  if (kind === "board") return "Nuevo tablero";
   if (kind === "link") return "Enlace";
   if (kind === "image") return "Imagen";
   if (kind === "database") return "Base de datos";
@@ -674,7 +697,7 @@ function defaultItemTitle(kind: ItemKind) {
 
 function defaultItemWidth(kind: ItemKind) {
   if (kind === "text") return 280;
-  if (kind === "board") return 260;
+  if (kind === "board") return 200;
   if (kind === "link") return 240;
   if (kind === "image") return 220;
   if (kind === "database") return 420;
@@ -688,7 +711,7 @@ function defaultItemWidth(kind: ItemKind) {
 
 function defaultItemHeight(kind: ItemKind) {
   if (kind === "text") return 90;
-  if (kind === "board") return 180;
+  if (kind === "board") return 44;
   if (kind === "link") return 110;
   if (kind === "image") return 160;
   if (kind === "database") return 240;
