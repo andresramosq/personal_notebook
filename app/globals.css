@@ -399,6 +399,11 @@ button {
   font-weight: 600;
 }
 
+.board-header-search {
+  flex: 0 1 240px;
+  margin-left: auto;
+}
+
 .sidebar-toggle {
   display: none;
   width: 34px;

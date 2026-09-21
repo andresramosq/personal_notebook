@@ -716,7 +716,7 @@ function defaultItemTitle(kind: ItemKind) {
   if (kind === "image") return "Imagen";
   if (kind === "database") return "Base de datos";
   if (kind === "todo") return "To-do";
-  if (kind === "kanban") return "Tablero";
+  if (kind === "kanban") return "Columnas";
   if (kind === "comment") return "";
   if (kind === "text") return "";
   return "Nueva nota";
