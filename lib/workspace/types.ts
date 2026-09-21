@@ -6,6 +6,8 @@ export type ItemKind =
   | "image"
   | "video"
   | "file"
+  | "column"
+  | "table"
   | "database"
   | "drawing"
   | "todo"
@@ -57,7 +59,11 @@ export type CanvasItem = {
   title: string;
   content: string;
   url: string;
+  caption: string;
   nestedCanvasId: string | null;
+  parentColumnId: string | null;
+  sortOrder: number;
+  inUnsorted: boolean;
   databaseFields: DatabaseField[];
   databaseRecords: DatabaseRecord[];
   points: DrawingPoint[];

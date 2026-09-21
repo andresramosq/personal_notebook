@@ -5,6 +5,7 @@ import { CanvasView } from "@/components/system/canvas-view";
 import { DatabaseView } from "@/components/system/database-view";
 import { Icon } from "@/components/system/icon";
 import { TrashPanel } from "@/components/system/trash-panel";
+import { UnsortedPanel } from "@/components/system/unsorted-panel";
 import { useWorkspace } from "@/hooks/use-workspace";
 import type { CanvasMode } from "@/lib/workspace/types";
 
@@ -16,6 +17,7 @@ export function WorkspaceApp() {
   const [query, setQuery] = useState("");
   const [openDatabaseId, setOpenDatabaseId] = useState<string | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
+  const [unsortedOpen, setUnsortedOpen] = useState(false);
 
   const deleteItem = workspace.deleteItem;
 
@@ -136,6 +138,19 @@ export function WorkspaceApp() {
             placeholder="Buscar en este tablero"
           />
         </label>
+
+        <button
+          type="button"
+          className="unsorted-toggle"
+          onClick={() => setUnsortedOpen((open) => !open)}
+        >
+          Sin clasificar
+          {workspace.unsortedItems.length ? (
+            <span className="unsorted-toggle-count">
+              {workspace.unsortedItems.length}
+            </span>
+          ) : null}
+        </button>
       </header>
 
       <section className="system-content">
@@ -197,6 +212,19 @@ export function WorkspaceApp() {
           onClose={() => setTrashOpen(false)}
         />
       ) : null}
+
+      <UnsortedPanel
+        open={unsortedOpen}
+        items={workspace.unsortedItems}
+        onClose={() => setUnsortedOpen(false)}
+        onDragItem={(itemId, event) => {
+          event.dataTransfer.setData(
+            "application/x-libreta-unsorted-item",
+            itemId,
+          );
+          event.dataTransfer.effectAllowed = "move";
+        }}
+      />
     </main>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { BlockComment } from "@/components/system/block-comment";
 import { BlockKanban } from "@/components/system/block-kanban";
+import { BlockTable } from "@/components/system/block-table";
 import { BlockTodo } from "@/components/system/block-todo";
 import { Icon } from "@/components/system/icon";
 import {
@@ -25,6 +27,8 @@ type ObjectCardProps = {
   onDelete: () => void;
   onEnterBoard: () => void;
   onOpenDatabase: () => void;
+  embedded?: boolean;
+  onPrepareDrag?: (event: React.DragEvent<HTMLElement>) => void;
 };
 
 const COLORS: ItemColor[] = [
@@ -49,9 +53,54 @@ export const ObjectCard = memo(function ObjectCard({
   onDelete,
   onEnterBoard,
   onOpenDatabase,
+  embedded = false,
+  onPrepareDrag,
 }: ObjectCardProps) {
   const [position, setPosition] = useState({ x: item.x, y: item.y });
   const positionRef = useRef(position);
+  const [linkPreview, setLinkPreview] = useState<{
+    title: string;
+    description: string;
+    image: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (item.kind !== "link") {
+      setLinkPreview(null);
+      return;
+    }
+
+    const url = item.url.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      setLinkPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data) => {
+          if (cancelled || !data) return;
+          setLinkPreview({
+            title: data.title ?? "",
+            description: data.description ?? "",
+            image: data.image ?? "",
+          });
+          if (!item.title.trim() && data.title) {
+            onUpdate({ title: data.title });
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setLinkPreview(null);
+        });
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [item.kind, item.url]);
 
   useEffect(() => {
     const next = { x: item.x, y: item.y };
@@ -60,7 +109,7 @@ export const ObjectCard = memo(function ObjectCard({
   }, [item.x, item.y]);
 
   const startDrag = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || linking) return;
+    if (embedded || event.button !== 0 || linking) return;
     event.preventDefault();
     event.stopPropagation();
     onSelect();
@@ -110,12 +159,18 @@ export const ObjectCard = memo(function ObjectCard({
         selected ? "is-selected" : ""
       } ${linking ? "is-linking" : ""} ${
         item.kind === "line" || item.kind === "drawing" ? "item-stroke" : ""
-      }`}
-      style={{
-        transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
-        width: item.width,
-        height: item.height,
-      }}
+      } ${embedded ? "canvas-item-embedded" : ""}`}
+      style={
+        embedded
+          ? { width: "100%", minHeight: item.height }
+          : {
+              transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
+              width: item.width,
+              height: item.height,
+            }
+      }
+      draggable={Boolean(onPrepareDrag)}
+      onDragStart={onPrepareDrag}
       onPointerDown={(event) => {
         event.stopPropagation();
         onSelect();
@@ -202,9 +257,9 @@ export const ObjectCard = memo(function ObjectCard({
         />
       ) : null}
 
-      {item.kind !== "drawing" && item.kind !== "line" ? (
+      {!embedded && item.kind !== "drawing" && item.kind !== "line" ? (
         <div className="item-drag-area" onPointerDown={startDrag} />
-      ) : (
+      ) : !embedded ? (
         <div
           className="drawing-drag-area"
           onPointerDown={(event) => {
@@ -212,7 +267,7 @@ export const ObjectCard = memo(function ObjectCard({
             startDrag(event);
           }}
         />
-      )}
+      ) : null}
       <div
         className={`item-content ${
           item.kind === "drawing" || item.kind === "line"
@@ -332,6 +387,7 @@ export const ObjectCard = memo(function ObjectCard({
               <input
                 className="item-title"
                 value={item.title}
+                placeholder={linkPreview?.title || "Enlace"}
                 onPointerDown={(event) => event.stopPropagation()}
                 onChange={(event) => onUpdate({ title: event.target.value })}
               />
@@ -342,7 +398,23 @@ export const ObjectCard = memo(function ObjectCard({
               placeholder="https://"
               onPointerDown={(event) => event.stopPropagation()}
               onChange={(event) => onUpdate({ url: event.target.value })}
+              onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+                if (event.key === "Enter") {
+                  event.currentTarget.blur();
+                }
+              }}
             />
+            {linkPreview?.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="link-preview-image"
+                src={linkPreview.image}
+                alt=""
+              />
+            ) : null}
+            {linkPreview?.description ? (
+              <p className="link-preview-description">{linkPreview.description}</p>
+            ) : null}
             {item.url.startsWith("http") ? (
               <a
                 className="link-open"
@@ -367,12 +439,21 @@ export const ObjectCard = memo(function ObjectCard({
               onChange={(event) => onUpdate({ title: event.target.value })}
             />
             {isDisplayableImageUrl(item.url) ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className="image-preview"
-                src={item.url}
-                alt={item.title || "Imagen"}
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  className="image-preview"
+                  src={item.url}
+                  alt={item.title || "Imagen"}
+                />
+                <input
+                  className="image-caption"
+                  value={item.caption}
+                  placeholder="Añade un pie de foto"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onChange={(event) => onUpdate({ caption: event.target.value })}
+                />
+              </>
             ) : (
               <input
                 className="link-url"
@@ -483,12 +564,25 @@ export const ObjectCard = memo(function ObjectCard({
               <Icon name="comment" size={15} />
               <span>Comentario</span>
             </div>
-            <textarea
-              className="comment-content"
-              value={item.content}
-              placeholder="Escribe tu comentario…"
+            <BlockComment
+              content={item.content}
+              onChange={(next) => onUpdate({ content: next })}
+            />
+          </>
+        ) : null}
+
+        {item.kind === "table" ? (
+          <>
+            <input
+              className="item-title"
+              value={item.title}
+              placeholder="Tabla"
               onPointerDown={(event) => event.stopPropagation()}
-              onChange={(event) => onUpdate({ content: event.target.value })}
+              onChange={(event) => onUpdate({ title: event.target.value })}
+            />
+            <BlockTable
+              content={item.content}
+              onChange={(next) => onUpdate({ content: next })}
             />
           </>
         ) : null}

@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createId } from "@/lib/workspace/id";
 import {
+  createDefaultColumnContent,
+  createDefaultCommentContent,
   createDefaultKanbanContent,
+  createDefaultTableContent,
   createDefaultTodoContent,
 } from "@/lib/workspace/blocks";
 import {
@@ -133,6 +136,11 @@ export function useWorkspace() {
       state?.items.filter((item) => item.canvasId === state.activeCanvasId) ??
       [],
     [state],
+  );
+
+  const unsortedItems = useMemo(
+    () => items.filter((item) => item.inUnsorted),
+    [items],
   );
 
   const links = useMemo(
@@ -315,16 +323,24 @@ export function useWorkspace() {
             ? createDefaultTodoContent()
             : kind === "kanban"
               ? createDefaultKanbanContent()
-              : kind === "comment"
-                ? "Escribe tu comentario…"
-                : "",
+              : kind === "column"
+                ? createDefaultColumnContent()
+                : kind === "table"
+                  ? createDefaultTableContent()
+                  : kind === "comment"
+                    ? createDefaultCommentContent()
+                    : "",
       url:
         kind === "link"
           ? "https://"
           : kind === "video"
             ? ""
             : "",
+      caption: "",
       nestedCanvasId,
+      parentColumnId: null,
+      sortOrder: 0,
+      inUnsorted: false,
       databaseFields:
         kind === "database"
           ? [
@@ -390,7 +406,11 @@ export function useWorkspace() {
       title: kind === "file" ? asset.name : kind === "video" ? "Video" : asset.name,
       content: "",
       url: asset.url,
+      caption: "",
       nestedCanvasId: null,
+      parentColumnId: null,
+      sortOrder: 0,
+      inUnsorted: true,
       databaseFields: [],
       databaseRecords: [],
       points: [],
@@ -429,7 +449,11 @@ export function useWorkspace() {
       title: "",
       content: "",
       url: "",
+      caption: "",
       nestedCanvasId: null,
+      parentColumnId: null,
+      sortOrder: 0,
+      inUnsorted: false,
       databaseFields: [],
       databaseRecords: [],
       points: normalized.points,
@@ -495,7 +519,11 @@ export function useWorkspace() {
       title: "",
       content: "",
       url: "",
+      caption: "",
       nestedCanvasId: null,
+      parentColumnId: null,
+      sortOrder: 0,
+      inUnsorted: false,
       databaseFields: [],
       databaseRecords: [],
       points: normalized.points,
@@ -601,13 +629,29 @@ export function useWorkspace() {
       const item = current.items.find((candidate) => candidate.id === id);
       if (!item) return current;
 
+      const nextItems = current.items
+        .filter((candidate) => candidate.id !== id)
+        .map((candidate) => {
+          if (item.kind !== "column" || candidate.parentColumnId !== id) {
+            return candidate;
+          }
+          return {
+            ...candidate,
+            parentColumnId: null,
+            inUnsorted: false,
+            x: item.x + 24,
+            y: item.y + candidate.sortOrder * 48 + 64,
+            updatedAt: Date.now(),
+          };
+        });
+
       return {
         ...current,
         trash: [
           { item, deletedAt: Date.now() },
           ...current.trash.filter((entry) => entry.item.id !== item.id),
         ],
-        items: current.items.filter((candidate) => candidate.id !== id),
+        items: nextItems,
         links: current.links.filter(
           (link) => link.fromId !== id && link.toId !== id,
         ),
@@ -749,6 +793,7 @@ export function useWorkspace() {
     deleteCanvas,
     createItem,
     createUploadedItem,
+    unsortedItems,
     createDrawing,
     createLine,
     duplicateItem,
@@ -775,6 +820,8 @@ function defaultItemTitle(kind: ItemKind) {
   if (kind === "database") return "Base de datos";
   if (kind === "todo") return "To-do";
   if (kind === "kanban") return "Columnas";
+  if (kind === "column") return "Columna";
+  if (kind === "table") return "Tabla";
   if (kind === "comment") return "";
   if (kind === "text") return "";
   return "Nueva nota";
@@ -787,6 +834,8 @@ function defaultItemWidth(kind: ItemKind) {
   if (kind === "image") return 280;
   if (kind === "video") return 360;
   if (kind === "file") return 260;
+  if (kind === "column") return 280;
+  if (kind === "table") return 420;
   if (kind === "database") return 420;
   if (kind === "drawing") return 120;
   if (kind === "todo") return 260;
@@ -803,6 +852,8 @@ function defaultItemHeight(kind: ItemKind) {
   if (kind === "image") return 200;
   if (kind === "video") return 220;
   if (kind === "file") return 88;
+  if (kind === "column") return 320;
+  if (kind === "table") return 220;
   if (kind === "database") return 240;
   if (kind === "drawing") return 80;
   if (kind === "todo") return 180;

@@ -72,6 +72,21 @@ export function BlockTodo({ content, onChange }: BlockTodoProps) {
               });
             }}
           />
+          <input
+            type="date"
+            className="todo-due"
+            value={item.dueDate ?? ""}
+            onPointerDown={(event) => event.stopPropagation()}
+            onChange={(event) => {
+              save({
+                items: block.items.map((entry) =>
+                  entry.id === item.id
+                    ? { ...entry, dueDate: event.target.value || null }
+                    : entry,
+                ),
+              });
+            }}
+          />
           <button
             type="button"
             className="todo-remove"
@@ -95,7 +110,13 @@ export function BlockTodo({ content, onChange }: BlockTodoProps) {
           save({
             items: [
               ...block.items,
-              { id: createId(), text: "Nueva tarea", done: false, indent: 0 },
+              {
+                id: createId(),
+                text: "Nueva tarea",
+                done: false,
+                indent: 0,
+                dueDate: null,
+              },
             ],
           });
         }}

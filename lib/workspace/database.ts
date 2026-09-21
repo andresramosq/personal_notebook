@@ -126,6 +126,10 @@ db.exec(`
 ensureColumn("canvas_items", "points_json", 'TEXT NOT NULL DEFAULT "[]"');
 ensureColumn("canvas_items", "stroke_color", 'TEXT NOT NULL DEFAULT "#292929"');
 ensureColumn("canvas_items", "stroke_width", "REAL NOT NULL DEFAULT 2");
+ensureColumn("canvas_items", "caption", 'TEXT NOT NULL DEFAULT ""');
+ensureColumn("canvas_items", "parent_column_id", "TEXT");
+ensureColumn("canvas_items", "sort_order", "INTEGER NOT NULL DEFAULT 0");
+ensureColumn("canvas_items", "in_unsorted", "INTEGER NOT NULL DEFAULT 0");
 
 function ensureColumn(table: string, column: string, definition: string) {
   const columns = db
@@ -160,6 +164,10 @@ type ItemRow = {
   points_json: string;
   stroke_color: string;
   stroke_width: number;
+  caption: string;
+  parent_column_id: string | null;
+  sort_order: number;
+  in_unsorted: number;
   created_at: number;
   updated_at: number;
 };
@@ -229,6 +237,10 @@ export function readWorkspace(): {
     content: row.content,
     url: row.url,
     nestedCanvasId: row.nested_canvas_id,
+    caption: row.caption ?? "",
+    parentColumnId: row.parent_column_id ?? null,
+    sortOrder: row.sort_order ?? 0,
+    inUnsorted: Boolean(row.in_unsorted),
     databaseFields: [],
     databaseRecords: [],
     points: parseDrawingPoints(row.points_json),
@@ -384,10 +396,12 @@ const persistWorkspace = db.transaction((state: WorkspaceState) => {
     INSERT INTO canvas_items (
       id, canvas_id, kind, title, content, url, nested_canvas_id,
       x, y, width, height, color, points_json, stroke_color, stroke_width,
+      caption, parent_column_id, sort_order, in_unsorted,
       created_at, updated_at
     ) VALUES (
       @id, @canvasId, @kind, @title, @content, @url, @nestedCanvasId,
       @x, @y, @width, @height, @color, @pointsJson, @strokeColor, @strokeWidth,
+      @caption, @parentColumnId, @sortOrder, @inUnsorted,
       @createdAt, @updatedAt
     )
   `);
@@ -397,6 +411,10 @@ const persistWorkspace = db.transaction((state: WorkspaceState) => {
       pointsJson: JSON.stringify(item.points ?? []),
       strokeColor: item.strokeColor ?? "#292929",
       strokeWidth: item.strokeWidth ?? 2,
+      caption: item.caption ?? "",
+      parentColumnId: item.parentColumnId ?? null,
+      sortOrder: item.sortOrder ?? 0,
+      inUnsorted: item.inUnsorted ? 1 : 0,
     });
   }
 

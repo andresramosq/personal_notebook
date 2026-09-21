@@ -11,7 +11,10 @@ const TOOLS: Array<{
     | "link"
     | "todo"
     | "line"
+    | "kanban"
     | "board"
+    | "comment"
+    | "database"
     | "image"
     | "upload"
     | "pen"
@@ -23,9 +26,12 @@ const TOOLS: Array<{
   { kind: "note", icon: "note", label: "Nota", section: "main" },
   { kind: "link", icon: "link", label: "Enlace", section: "main" },
   { kind: "todo", icon: "todo", label: "To-do", section: "main" },
-  { kind: "line", icon: "line", label: "Línea", section: "main" },
+  { kind: "column", icon: "kanban", label: "Columna", section: "main" },
   { kind: "board", icon: "board", label: "Tablero", section: "main" },
+  { kind: "comment", icon: "comment", label: "Comentario", section: "main" },
+  { kind: "table", icon: "database", label: "Tabla", section: "main" },
   { kind: "video", icon: "image", label: "Video", section: "main" },
+  { kind: "line", icon: "line", label: "Línea", section: "bottom" },
   { kind: "upload", icon: "upload", label: "Subir", section: "bottom" },
   { kind: "draw", icon: "pen", label: "Dibujar", section: "bottom" },
   { kind: "connect", icon: "connect", label: "Unir", section: "bottom" },

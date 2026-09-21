@@ -134,7 +134,11 @@ function migrateFromV2(
       title: item.title ?? "",
       content: item.content ?? "",
       url: item.url ?? "",
+      caption: item.caption ?? "",
       nestedCanvasId: item.nestedCanvasId ?? null,
+      parentColumnId: item.parentColumnId ?? null,
+      sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : 0,
+      inUnsorted: Boolean(item.inUnsorted),
       databaseFields: item.databaseFields ?? [],
       databaseRecords: item.databaseRecords ?? [],
       points: item.points ?? [],
@@ -179,7 +183,11 @@ function migrateLegacyWorkspace(
       title: object.title ?? "",
       content: object.description ?? "",
       url: "",
+      caption: "",
       nestedCanvasId: null,
+      parentColumnId: null,
+      sortOrder: 0,
+      inUnsorted: false,
       databaseFields: [],
       databaseRecords: [],
       points: [],
@@ -321,7 +329,11 @@ function normalizeItem(
     title: item.title ?? defaultTitle(kind),
     content: item.content ?? "",
     url: item.url ?? "",
+    caption: item.caption ?? "",
     nestedCanvasId,
+    parentColumnId: item.parentColumnId ?? null,
+    sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : 0,
+    inUnsorted: Boolean(item.inUnsorted),
     databaseFields: Array.isArray(item.databaseFields)
       ? item.databaseFields
       : [],
@@ -360,6 +372,8 @@ function migrateKind(kind?: string): ItemKind {
   if (kind === "image") return "image";
   if (kind === "video") return "video";
   if (kind === "file") return "file";
+  if (kind === "column") return "column";
+  if (kind === "table") return "table";
   if (kind === "database") return "database";
   if (kind === "drawing") return "drawing";
   if (kind === "todo") return "todo";

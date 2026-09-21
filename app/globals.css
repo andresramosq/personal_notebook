@@ -1341,11 +1341,252 @@ button {
   font-size: 12px;
 }
 
+.canvas-item-embedded {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: auto;
+  box-shadow: none;
+}
+
+.column-card {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.column-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.column-card-title {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.column-collapse {
+  border: 0;
+  border-radius: 6px;
+  background: #f2f2ef;
+  padding: 2px 8px;
+}
+
+.column-card-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.column-child-wrap {
+  flex: 0 0 auto;
+}
+
+.column-empty,
+.column-card-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.block-table-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.block-table-grid {
+  display: grid;
+  gap: 6px;
+  overflow: auto;
+}
+
+.block-table-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.block-table-type,
+.block-table-value {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+}
+
+.block-comment {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-thread {
+  overflow: auto;
+}
+
+.comment-message {
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 55%);
+  padding: 8px;
+}
+
+.comment-message p {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.comment-draft {
+  min-height: 56px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.comment-send {
+  align-self: flex-start;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  padding: 6px 12px;
+  color: white;
+}
+
+.unsorted-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.unsorted-toggle-count {
+  min-width: 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  padding: 0 5px;
+  color: white;
+  font-size: 10px;
+  line-height: 18px;
+}
+
+.unsorted-panel {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  width: 280px;
+  max-height: calc(100vh - 80px);
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 16px 40px rgb(25 25 25 / 14%);
+}
+
+.unsorted-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.unsorted-help {
+  margin: 0;
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.unsorted-list {
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  overflow: auto;
+}
+
+.unsorted-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: grab;
+}
+
+.unsorted-item:hover {
+  background: #f7f7f4;
+}
+
+.unsorted-chip {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.todo-due {
+  width: 118px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.image-caption {
+  margin-top: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .link-open {
   margin-top: 10px;
   color: var(--accent);
   font-size: 11px;
   text-decoration: none;
+}
+
+.link-preview-image {
+  width: 100%;
+  max-height: 120px;
+  margin-top: 8px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.link-preview-description {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .image-preview {

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { BoardCard } from "@/components/system/board-card";
+import { ColumnCard } from "@/components/system/column-card";
 import { CanvasPalette } from "@/components/system/canvas-palette";
 import { CanvasSelectionBar } from "@/components/system/canvas-selection-bar";
 import { Icon } from "@/components/system/icon";
@@ -49,12 +50,12 @@ type CanvasViewProps = {
 const DEFAULT_CAMERA: CanvasCamera = { x: 0, y: 0, zoom: 1 };
 const ITEM_KINDS: ItemKind[] = [
   "note",
-  "text",
-  "image",
   "link",
-  "board",
-  "database",
   "todo",
+  "column",
+  "board",
+  "comment",
+  "table",
   "video",
 ];
 
@@ -241,7 +242,32 @@ export function CanvasView({
   };
 
   const byId = new Map(items.map((item) => [item.id, item]));
+  const canvasItems = items.filter((item) => !item.inUnsorted);
+  const columns = canvasItems.filter((item) => item.kind === "column");
+  const rootItems = canvasItems.filter(
+    (item) => !item.parentColumnId && item.kind !== "column",
+  );
   const selectedItem = selectedId ? byId.get(selectedId) : undefined;
+
+  const assignToColumn = (childId: string, columnId: string, sortOrder: number) => {
+    onUpdate(childId, {
+      parentColumnId: columnId,
+      sortOrder,
+      inUnsorted: false,
+    });
+  };
+
+  const releaseOnCanvas = (
+    itemId: string,
+    position: { x: number; y: number },
+  ) => {
+    onUpdate(itemId, {
+      parentColumnId: null,
+      inUnsorted: false,
+      x: position.x - 130,
+      y: position.y - 80,
+    });
+  };
 
   const importFiles = async (
     files: FileList,
@@ -319,6 +345,24 @@ export function CanvasView({
           return;
         }
 
+        const moveId = event.dataTransfer.getData(
+          "application/x-libreta-move-item",
+        );
+        if (moveId) {
+          releaseOnCanvas(moveId, position);
+          onSelect(moveId);
+          return;
+        }
+
+        const unsortedId = event.dataTransfer.getData(
+          "application/x-libreta-unsorted-item",
+        );
+        if (unsortedId) {
+          releaseOnCanvas(unsortedId, position);
+          onSelect(unsortedId);
+          return;
+        }
+
         const kind = (event.dataTransfer.getData(
           "application/x-libreta-item",
         ) || event.dataTransfer.getData("text/plain")) as ItemKind;
@@ -389,7 +433,7 @@ export function CanvasView({
           ) : null}
         </svg>
 
-        {items.map((item) =>
+        {rootItems.map((item) =>
           item.kind === "board" ? (
             <BoardCard
               key={item.id}
@@ -423,9 +467,54 @@ export function CanvasView({
               }}
               onEnterBoard={() => onEnterBoard(item)}
               onOpenDatabase={() => onOpenDatabase(item)}
+              onPrepareDrag={
+                selectedId === item.id
+                  ? (event) => {
+                      event.dataTransfer.setData(
+                        "application/x-libreta-move-item",
+                        item.id,
+                      );
+                      event.dataTransfer.effectAllowed = "move";
+                    }
+                  : undefined
+              }
             />
           ),
         )}
+
+        {columns.map((column) => (
+          <ColumnCard
+            key={column.id}
+            item={column}
+            children={canvasItems.filter(
+              (item) => item.parentColumnId === column.id,
+            )}
+            zoom={liveCamera.zoom}
+            selectedId={selectedId}
+            linking={mode === "connect"}
+            onSelect={() => handleItemSelect(column)}
+            onMove={(x, y) => onUpdate(column.id, { x, y })}
+            onResize={(width, height) =>
+              onUpdate(column.id, { width, height })
+            }
+            onUpdate={(changes) => onUpdate(column.id, changes)}
+            onDelete={() => {
+              onDelete(column.id);
+              onSelect(null);
+            }}
+            onChildUpdate={(id, changes) => onUpdate(id, changes)}
+            onChildDelete={(id) => {
+              onDelete(id);
+              onSelect(null);
+            }}
+            onChildSelect={(id) => handleItemSelect(byId.get(id)!)}
+            onAssignChild={(childId, sortOrder) =>
+              assignToColumn(childId, column.id, sortOrder)
+            }
+            onEnterBoard={onEnterBoard}
+            onOpenDatabase={onOpenDatabase}
+          />
+        ))}
       </div>
 
       <CanvasPalette
