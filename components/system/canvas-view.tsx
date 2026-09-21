@@ -199,13 +199,6 @@ export function CanvasView({
         ))}
       </div>
 
-      {!boardItems.length ? (
-        <div className="canvas-empty">
-          <strong>Tu tablero está vacío</strong>
-          <span>Pulsa Tablero en la barra o arrástralo al lienzo.</span>
-        </div>
-      ) : null}
-
       <div className="canvas-controls">
         <button type="button" onClick={() => zoomAtCenter(0.85)} aria-label="Alejar">
           −

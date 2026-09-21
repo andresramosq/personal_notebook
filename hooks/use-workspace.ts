@@ -149,10 +149,23 @@ export function useWorkspace() {
   const canvasPath = useMemo(() => {
     if (!state?.activeCanvasId) return [];
     const byId = new Map(state.canvases.map((canvas) => [canvas.id, canvas]));
-    const path = [];
+    const boardByNestedCanvas = new Map<string, CanvasItem>();
+    for (const item of state.items) {
+      if (item.kind === "board" && item.nestedCanvasId) {
+        boardByNestedCanvas.set(item.nestedCanvasId, item);
+      }
+    }
+
+    const resolveName = (canvas: WorkspaceState["canvases"][number]) => {
+      if (!canvas.parentId) return canvas.name;
+      const boardItem = boardByNestedCanvas.get(canvas.id);
+      return boardItem?.title?.trim() || canvas.name || "Nuevo tablero";
+    };
+
+    const path: Array<{ id: string; name: string }> = [];
     let current = byId.get(state.activeCanvasId);
     while (current) {
-      path.unshift(current);
+      path.unshift({ id: current.id, name: resolveName(current) });
       current = current.parentId ? byId.get(current.parentId) : undefined;
     }
     return path;
@@ -202,14 +215,28 @@ export function useWorkspace() {
   };
 
   const renameCanvas = (name: string) => {
-    update((current) => ({
-      ...current,
-      canvases: current.canvases.map((canvas) =>
-        canvas.id === current.activeCanvasId
-          ? { ...canvas, name, updatedAt: Date.now() }
-          : canvas,
-      ),
-    }));
+    update((current) => {
+      const activeId = current.activeCanvasId;
+      const active = current.canvases.find((canvas) => canvas.id === activeId);
+      const items =
+        active?.parentId
+          ? current.items.map((item) =>
+              item.kind === "board" && item.nestedCanvasId === activeId
+                ? { ...item, title: name, updatedAt: Date.now() }
+                : item,
+            )
+          : current.items;
+
+      return {
+        ...current,
+        items,
+        canvases: current.canvases.map((canvas) =>
+          canvas.id === activeId
+            ? { ...canvas, name, updatedAt: Date.now() }
+            : canvas,
+        ),
+      };
+    });
   };
 
   const deleteCanvas = (id: string) => {

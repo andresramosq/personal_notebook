@@ -244,9 +244,11 @@ export function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceSta
     }
   }
 
-  const items = (Array.isArray(state.items) ? state.items : [])
+  let items = (Array.isArray(state.items) ? state.items : [])
     .filter((item) => canvasIds.has(item.canvasId))
     .map((item) => normalizeItem(item, now, canvasIds));
+
+  canvases = syncNestedCanvasNames(canvases, items);
 
   const itemIds = new Set(items.map((item) => item.id));
   const links = (Array.isArray(state.links) ? state.links : [])
@@ -279,6 +281,26 @@ export function normalizeWorkspace(state: Partial<WorkspaceState>): WorkspaceSta
     trash,
     activeCanvasId,
   };
+}
+
+function syncNestedCanvasNames(
+  canvases: WorkspaceCanvas[],
+  items: CanvasItem[],
+): WorkspaceCanvas[] {
+  const boardByNestedCanvas = new Map<string, CanvasItem>();
+  for (const item of items) {
+    if (item.kind === "board" && item.nestedCanvasId) {
+      boardByNestedCanvas.set(item.nestedCanvasId, item);
+    }
+  }
+
+  return canvases.map((canvas) => {
+    if (!canvas.parentId) return canvas;
+    const boardItem = boardByNestedCanvas.get(canvas.id);
+    const title = boardItem?.title?.trim();
+    if (!title || canvas.name === title) return canvas;
+    return { ...canvas, name: title, updatedAt: Date.now() };
+  });
 }
 
 function normalizeItem(

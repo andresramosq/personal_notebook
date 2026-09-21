@@ -43,6 +43,7 @@ export function WorkspaceApp() {
 
   const path = workspace.canvasPath;
   const ancestors = path.slice(0, -1);
+  const currentSegment = path[path.length - 1];
   const canGoBack = ancestors.length > 0;
 
   return (
@@ -60,15 +61,15 @@ export function WorkspaceApp() {
         ) : null}
 
         <nav className="board-header-path" aria-label="Ruta del tablero">
-          {ancestors.map((canvas) => (
-            <span key={canvas.id} className="board-header-crumb">
-              <span>{canvas.name}</span>
+          {ancestors.map((segment) => (
+            <span key={segment.id} className="board-header-crumb">
+              <span>{segment.name}</span>
               <span className="board-header-sep">/</span>
             </span>
           ))}
           <input
             className="board-header-name"
-            value={workspace.activeCanvas.name}
+            value={currentSegment?.name ?? workspace.activeCanvas.name}
             onChange={(event) => workspace.renameCanvas(event.target.value)}
             aria-label="Nombre del tablero actual"
           />
